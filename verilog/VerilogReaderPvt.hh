@@ -140,6 +140,20 @@ public:
 					  int from_index,
 					  int to_index);
   VerilogModule *module(Cell *cell);
+
+  std::unordered_map<const char*, const char*> umap_inst_to_module;
+  std::unordered_map<const char*, const char*> umap_module_to_inst;
+  std::unordered_map<const char*, const char*> umap_module_to_port;
+  std::unordered_map<const char*, std::unordered_map<const char*, const char*>> umap_inst_to_net;
+  void symbolTable(VerilogModule *module);
+  void getMap(VerilogModule *module);
+  void getInst(const char *module);
+  void getModule(const char *inst);
+  void getNet(const char *inst, const char *pin);
+  VerilogModule *namemap(VerilogModule *module);
+  void module_cell(VerilogStmt *s, std::string result, const char * origin_inst, const char * origin_pin);
+  void liberty_cell(VerilogStmt *s, std::string result, const char * origin_inst, const char * origin_pin);
+
   Instance *linkNetwork(const char *top_cell_name,
 			bool make_black_boxes,
 			Report *report);
