@@ -150,9 +150,10 @@ public:
   void getInst(const char *module);
   void getModule(const char *inst);
   void getNet(const char *inst, const char *pin);
+  void cut_input(std::string path, VerilogStmt *s);
   VerilogModule *namemap(VerilogModule *module);
-  void module_cell(VerilogStmt *s, std::string result, const char * origin_inst, const char * origin_pin);
-  void liberty_cell(VerilogStmt *s, std::string result, const char * origin_inst, const char * origin_pin);
+  void module_cell(VerilogStmt *s, std::string result, const char * origin_inst, const char *origin_pin, const char * cur_inst, const char * cur_pin);
+  void liberty_cell(VerilogStmt *s, std::string result, const char * origin_inst, const char *origin_pin, const char * cur_inst, const char * cur_pin);
 
   Instance *linkNetwork(const char *top_cell_name,
 			bool make_black_boxes,
