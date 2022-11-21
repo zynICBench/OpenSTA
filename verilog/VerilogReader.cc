@@ -1666,15 +1666,17 @@ namespace NameResolve {
 class Module
 {
 public:
+  enum {
+    PORT_INPUT = 0,
+    PORT_OUTPUT
+  };
   // build symbol table
   struct Symbol
   {
     bool isInst : 1;
     bool isNet : 1;
     bool isPort : 1;
-    // name of symbol
     std::string name;
-    // name of module if isInst otherwise NULL
     std::string moduleName;
     std::string src;
   };
@@ -1695,15 +1697,33 @@ public:
     sym.name = netname;
     sym.isPort = isPort;
   }
-  // connect two parts in the net
   void addConnection(std::string const &from, std::string const &to)
   {
     assert(symbols.count(to));
     symbols.find(to)->second.src = from;
   }
 
+  std::string searchInModule(std::string key, ModuleList* ml) {
+    /// if (key not in current module step in)
+    //1. search inst/pin -> port                 path = inst
+    std::cout << "src: " << symbols.find(key)->second.src << std::endl;
+    string port = symbols.find(key)->second.src;
+    if (port == "") {
+      if (key.find('/') == -1) return key;
+      if (key.find('/') != -1) {
+        // search in instance module
+      }
+    }
+    std::string res = searchInModule(port, ml);
+    symbols.find(key)->second.src = res;
+    return res;    
+  };
+
+
 private:
-  Symbol &addSymbol(std::string const &name) { symbols.insert({name, Symbol()}).first->second; }
+  Symbol &addSymbol(std::string const &name) { 
+    return symbols.insert({name, Symbol()}).first->second; 
+  }
   typedef std::unordered_map<std::string, Symbol> Symbols;
   Symbols symbols;
 
@@ -1712,47 +1732,64 @@ public:
   typedef typename Symbols::key_type key_type;
   typedef typename Symbols::value_type value_type;
   const_iterator find(key_type const &k) const { return symbols.find(k); }
-  const_iterator end() const { return symbols.end(); }
-  const_iterator begin() const { return symbols.begin(); }
+  // const_iterator end() const { return symbols.end(); }
+  // const_iterator begin() const { return symbols.begin(); }
+
+  void print() const {
+    for( auto & s : symbols) {
+        std::cout << "inst name: " << s.first << std::endl;
+        std::cout << "inst name cmp:  " << s.second.name << std::endl;
+        std::cout << "src: " << s.second.src << std::endl;
+        
+    }
+  }
 };
 
 class ModuleList
 {
 public:
-  Module *createModule(std::string const &name)
-  {
-    return modules.insert({name, new Module}).first->second;
-  }
-  ~ModuleList()
-  {
-    for (auto &x : modules) {
+  Module *createModule(std::string const &name) { return modules.insert({name, new Module}).first->second; }
+  ~ModuleList() {
+    for (auto &x : modules)
       delete x.second;
+  }
+  bool hasProcessed(std::string const &name) const {
+    return modules.count(name) != 0;
+  }
+
+  bool getPortDirection(VerilogModule *module, const char *port) const {
+    VerilogDcl *dcl = module->declaration(port);
+    // std::cout << port << " | " << dcl->direction()->isInput() << " | " << dcl->direction()->name() << std::endl;
+    return dcl->direction()->isInput();
+  }
+  void print() {
+    for (auto &x : modules) {
+      std::cout << x.first << std::endl;
+      x.second->print();
     }
   }
 
-  void findSource(std::string const &topmodule, std::string const &path) const
-  {
-    // Module *module = modules.at(topmodule);
-    // std::cout << module.name; << std::endl;
-    // auto it = module->find(topmodule);
-    // if (it != module->end()) {
-    //   auto &symbol = it->second;
-    // }
-    // for (auto &i : *module) {
-    //   auto &symbol = it->second;
-    // }
 
-    if (path.find("/") != -1) {
-      int pos = path.find("/");
-      std::string cut = path.substr(0, pos);
-      std::cout << cut << std::endl;
+  Module *searchcrossModule(Module *currentModule, std::string instport) const {
+    if (instport.find("/") != -1) {
+      int pos = instport.find("/");
+      std::string inst = instport.substr(0, pos);
+      auto &symbol = currentModule->find(inst)->second;
+      return modules.at(symbol.moduleName);
+    }
+    // TO DO: if symbol == "" -> get the liberty inst
 
-      findSource(topmodule, path.substr(pos+1));
-    }
-    else {
-      std::cout << path << std::endl;
-    }
+  };
+
+  void findSource(std::string currentModule, std::string const &path) const {
+      Module *module = modules.at(currentModule);     
+      std::cout << "path0: "<< path << std::endl;
+      ModuleList *ml;
+      std::string path1 = module->searchInModule(path, ml);
+      std::cout << "path: "<< path1 << std::endl;
+      module = searchcrossModule(module, path1);
   }
+
 
 private:
   typedef std::unordered_map<std::string, Module *> Modules;
@@ -1764,82 +1801,70 @@ private:
 using namespace NameResolve;
 ModuleList modulelist;
 void
-VerilogReader::getMap(VerilogModule *module)
+VerilogReader::processModule(VerilogModule *module)
 {
-  Module *m = modulelist.createModule(module->name());
-  std::cout << "createModule" << std::endl;
-  for (auto &s : *module->ports()) {
-    std::cout << s->name() << std::endl;
-    m->addNetSymbol(s->name(), true);
-    std::cout << "addnet" << std::endl;
-  }
+  if (modulelist.hasProcessed(module->name())) return;
 
+  Module *m = modulelist.createModule(module->name());
+  for (auto &s : *module->ports()) {
+    m->addNetSymbol(s->name(), true);
+  }
   for (auto &s : *module->stmts()) {
     if (s->isModuleInst()) {
       // find instance and module
       const char *inst_name = ((VerilogModuleInst *)s)->instanceName();
       const char *module_name = ((VerilogModuleInst *)s)->moduleName();
       m->addInstSymbol(inst_name, module_name);
-      std::cout << "addinst" << std::endl;
-  
-      VerilogNetSeq *netSeq = ((VerilogModuleInst *)s)->pins();
-      for (auto &net : *netSeq) {
-        assert(net->isNamedPortRefScalarNet());
-        m->addConnection(net->name(), ((VerilogNetPortRefScalarNet *)net)->netName());
-        std::cout << "addconnection" << std::endl;
-  
-      }
-      // m->addConnection()
       Cell *cell = network_->findAnyCell(module_name);
       VerilogModule *module2 = this->module(cell);
-      std::cout << "recursive" << std::endl;
-  
-      getMap(module2);
-    }
-    else if (s->isLibertyInst()) {
+
+      VerilogNetSeq *netSeq = ((VerilogModuleInst *)s)->pins();
+      for (auto &net : *netSeq) {
+        if(net->isNamedPortRefScalarNet()) {
+          // assert(net->isNamedPortRefScalarNet());
+          std::string instport = net->name();
+          bool isInput = modulelist.getPortDirection(module2, instport.c_str()) == Module::PORT_INPUT;
+          instport = std::string(inst_name) + "/" + instport;
+          m->addNetSymbol(instport, false);
+          std::string conn = ((VerilogNetPortRefScalarNet *)net)->netName();
+          m->addNetSymbol(conn, false);
+          if (isInput) {
+            m->addConnection(instport,conn);
+          } else {
+            m->addConnection(conn,instport);
+          }
+        } 
+        // else {
+        //   std::cout << "not a portrefscarlarnet" << std::endl;
+        // }
+      }
+      
+      processModule(module2);
+    } else if (s->isLibertyInst()) {
       const char *inst_name = ((VerilogModuleInst *)s)->instanceName();
       const char **netNames = ((VerilogLibertyInst *)s)->netNames();
       LibertyCell *cell = ((VerilogLibertyInst *)s)->cell();
+      m->addInstSymbol(inst_name, "");
+      
       auto iter = cell->portIterator();
       while (iter->hasNext()) {
         auto item = iter->next();
-        // TO DO: direction
-        //  item->direction();
         const char *port = item->name();
         if (netNames[item->pinIndex()]) {
           const char *pin = netNames[item->pinIndex()];
-          std::unordered_map<const char *, const char *> pair;
-          std::cout << "addpair" << std::endl;
-          pair.insert({pin, port});
+          std::string instport = std::string(inst_name) + "/" + port;
+          m->addNetSymbol(instport, false);
+          m->addNetSymbol(pin, false);
+          if (item->direction()->isInput())
+            m->addConnection(pin, instport);
+          else 
+            m->addConnection(instport, pin);
         }
       }
     }
   }
 };
 
-// void getInst(const char *module){
-//       auto iter = umap_module_to_inst.find(module);
-//       if (iter != umap_inst_to_module.end()) {
-//         std::cout << "module: " << iter->first << "  --------> inst: " << iter->second << std::endl;
-//       }
-// };
-// void getModule(const char *inst){
-//       auto iter = umap_inst_to_module.find(inst);
-//       if (iter != umap_inst_to_module.end()) {
-//         std::cout << "inst: " << iter->first << "  --------> module: " << iter->second << std::endl;
-//       }
-
-// };
-// void getNet(const char *inst, const char *pin){
-//       auto iter = umap_inst_to_net.find(inst);
-//       if (iter != umap_inst_to_net.end()) {
-//         std::unordered_map<const char*, const char*> pair = iter->second;
-//         auto iter1 = pair.find(pin);
-//         if (iter1 != pair.end()) {
-//           std::cout << "liberty inst: " << inst << "  --------> pin: " << pin << " port: " << iter1->second << std::endl;
-//         }
-//       }
-// };
 
 void VerilogReader::cut_input(std::string path, VerilogStmt *s)
 {
@@ -1969,9 +1994,10 @@ VerilogReader::linkNetwork(const char *top_cell_name,
 
     if (module) {
       std::cout << "top module name: " << module->name() << std::endl;
-      // getMap(module);
+      processModule(module);
+      modulelist.print();
       // modulelist.findSource(module->name(),"u_cm3_dap_ahb_ap/dap_ahb_habort_o");
-      namemap(module);
+      // namemap(module);
       // Seed the recursion for expansion with the top level instance.
       Instance *top_instance = network_->makeInstance(top_cell, "", nullptr);
       VerilogBindingTbl bindings(zero_net_name_, one_net_name_);
