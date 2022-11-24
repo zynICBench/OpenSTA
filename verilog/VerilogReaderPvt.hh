@@ -150,6 +150,7 @@ public:
   std::unordered_map<const char*, std::unordered_map<const char*, const char*>> umap_inst_to_net;
   void symbolTable(VerilogModule *module);
   void processModule(NameResolve::ModuleList& modulelist, VerilogModule *module);
+  void processBus(NameResolve::ModuleList& modulelist, VerilogModule *module);
   void getInst(const char *module);
   void getModule(const char *inst);
   void getNet(const char *inst, const char *pin);
