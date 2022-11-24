@@ -1663,175 +1663,6 @@ private:
   BindingMap map_;
 };
 
-namespace NameResolve {
-
-class ModuleList;
-
-class Module {
-public:
-  enum {
-    PORT_INPUT = 0,
-    PORT_OUTPUT
-  };
-
-
-  struct Range {
-    Range(int f, int t) : left(f), right(t), isIncr(right > left), curpos(left) {}
-    int  left;
-    int  right;
-    bool isIncr;
-
-  // iteration function
-    int curpos;
-    void incrpos() { curpos += isIncr ? 1 : -1; }
-    void resetpos() { curpos = left; }
-  };
-  // build symbol table
-  struct Symbol {
-    bool isInst : 1;
-    bool isNet : 1;
-    bool isPort : 1;
-    bool isBus : 1;
-    std::string name;
-    std::string moduleName;
-    std::string src;
-    // Range range;
-  };
-
-  void addInstSymbol(std::string const &instname, std::string const &modname) {
-    Symbol &sym = addSymbol(instname);
-    sym.isInst = true;
-    sym.isNet = false;
-    sym.name = instname;
-    sym.moduleName = modname;
-  }
-  void addNetSymbol(std::string const &netname, bool isPort, bool isBus) {
-    Symbol &sym = addSymbol(netname);
-    sym.isNet = true;
-    sym.isInst = false;
-    sym.name = netname;
-    sym.isPort = isPort;
-    sym.isBus = isBus;
-  }
-
-
-
-  Range getRange(std::string const & net, VerilogModule *module) {
-    VerilogDcl *dcl = module->declaration(net.c_str());
-    int from = ((VerilogDclBus *)dcl)->fromIndex();
-    int to = ((VerilogDclBus *)dcl)->toIndex();
-    return Range(from, to);
-  }
-
-  void addSplitedPortConnection(VerilogModule *module1, std::string inst_name, std::string port, std::string net, bool isInput) {
-    Range range = getRange(port, module1);
-    if(range.left == range.right && range.left == range.right) {
-      addNetSymbol(port, false, false);
-      addNetSymbol(net, false, false);
-      if (isInput) {addConnection(port, net);}
-      else {addConnection(net, port);}
-      return;
-    }
-    VerilogModule *curModule = this->module;
-    Range range2 = getRange(net, curModule);
-
-    while((range.curpos <= range.right && range.isIncr) || (range.curpos >= range.right && !range.isIncr)) {
-      std::stringstream ssp, ssn;
-      ssp << inst_name << "/" << port << "[" << range.curpos << "]";
-      ssn << net << "[" << range2.curpos << "]";
-      std::string instport = ssp.str();
-      std::string conn = ssn.str();
-      addNetSymbol(instport, false, false);
-      addNetSymbol(conn, false, false);
-      if (isInput) {addConnection(instport, conn);}
-      else {addConnection(conn, instport);}
-      range.incrpos();
-      range2.incrpos();
-    }
-    range.resetpos();
-    range2.resetpos();
-  }
-
-  void addConnection(std::string const &from, std::string const &to) {
-    assert(symbols.count(to));
-    std::cout << "add connection:  " << from << " ,  "<< to << std::endl;
-    symbols.find(to)->second.src = from;
-  }
-
-  typedef std::vector<std::string> StringVec;
-  StringVec searchInModule(std::string key, ModuleList *ml);
-
-  Module(VerilogModule* m) : module(m) {}
-
-private:
-  Symbol &addSymbol(std::string const &name) {
-    return symbols.insert({name, Symbol()}).first->second;
-  }
-  typedef std::unordered_map<std::string, Symbol> Symbols;
-  Symbols symbols;
-  VerilogModule *module;
-
-public:
-  typedef typename Symbols::const_iterator const_iterator;
-  typedef typename Symbols::key_type key_type;
-  typedef typename Symbols::value_type value_type;
-  const_iterator find(key_type const &k) const { return symbols.find(k); }
-  // const_iterator end() const { return symbols.end(); }
-  // const_iterator begin() const { return symbols.begin(); }
-
-  void print() const {
-    for (auto &s : symbols) {
-      std::cout << "inst name: " << s.first << std::endl;
-      // std::cout << "inst name cmp:  " << s.second.name << std::endl;
-      std::cout << "src: " << s.second.src << std::endl;
-    }
-  }
-};
-
-class ModuleList
-{
-public:
-  Module *createModule(std::string const &name, VerilogModule* m) { return modules.insert({name, new Module(m)}).first->second; }
-  ~ModuleList() {
-    for (auto &x : modules)
-      delete x.second;
-  }
-  bool hasProcessed(std::string const &name) const {
-    return modules.count(name) != 0;
-  }
-
-  bool getPortDirection(VerilogModule *module, const char *port) const {
-    VerilogDcl *dcl = module->declaration(port);
-    return dcl->direction()->isInput();
-  }
-
-  bool isBus(VerilogModule *module, const char *port) const { 
-    VerilogDcl *dcl = module->declaration(port);
-    return dcl->isBus();
-  }
-
-  void print() {
-    for (auto &x : modules) {
-      std::cout << x.first << std::endl;
-      x.second->print();
-    }
-  }
-
-  void findSource(std::string currentModule, std::string const &path) const {
-    Module *module = modules.at(currentModule);
-    
-    Module::StringVec res = module->searchInModule(path, (ModuleList *)this);
-    // std::cout << "input: " << path << "-------> res: " << res << std::endl;
-  }
-
-  Module *getModule(std::string modname) const {
-    return modules.find(modname)->second;
-  }
-
-private:
-  typedef std::unordered_map<std::string, Module *> Modules;
-  Modules modules;
-};
 
 // std::string
 // Module::searchBusPort(std::string key, ModuleList *ml) {
@@ -1847,73 +1678,12 @@ private:
 //     return res;
 // }
 
-
-
-Module::StringVec
-Module::searchInModule(std::string key, ModuleList *ml) {
-  StringVec vec;
-  Symbols::iterator it = symbols.find(key);
-  // if key is not in table
-  if (it == symbols.end()) {
-    vec.push_back(key);
-    return vec;
-  }
-
-  // if key is bus
-  if(symbols.find(key)->second.isBus) {
-    Range range = getRange(key, this->module);
-    for() {}
-    if(key.find("/")) {
-
-    }
-    vec = searchInModule("nvic_dbg_reg_addr[3]", ml);
-    
-    return vec;
-    // return searchBusPort();
-  }
-  
-
-  // if (key not in current module step in)
-  string res = it->second.src;
-  if (res == "") {
-    if (key.find('/') == -1) {
-
-      //TODO
-      vec.push_back(key);
-      return vec;
-    }
-    size_t pos = key.find('/');
-    if (pos != -1) {
-      std::string inst_name = key.substr(0, pos);
-      std::string modname = symbols.find(inst_name)->second.moduleName;
-      // std::cout << "inst and module: " << inst_name << "  " << modname << std::endl;
-      if (modname == "") {
-        vec.push_back(key);
-        return vec;
-      }
-      Module *inst_module = ml->getModule(modname);
-      vec = inst_module->searchInModule(key.substr(pos + 1), ml);
-      std::string inst_signal = vec.back();
-      res = inst_name + "/" + inst_signal;
-      
-      it->second.src = res;
-      // search in instance module
-    }
-  }
-  vec = searchInModule(res, ml);
-  res = vec.back();
-  it->second.src = res;  // update table
-  return vec;
-};
-
-}  // end namespace NameResolve
-
 using namespace NameResolve;
 void
 VerilogReader::processModule(ModuleList &modulelist, VerilogModule *module) {
   if (modulelist.hasProcessed(module->name())) return;
   Module *m = modulelist.createModule(module->name(), module);
-  for (auto &s : *module->ports()) {m->addNetSymbol(s->name(), true, false);}
+  for (auto &s : *module->ports()) {m->addNetSymbol(s->name(), true);}
   for (auto &s : *module->stmts()) {
     if (s->isModuleInst()) {
       // find instance and module
@@ -1932,15 +1702,15 @@ VerilogReader::processModule(ModuleList &modulelist, VerilogModule *module) {
             if (modulelist.isBus(module2, instport.c_str())) {
               std::string conn = ((VerilogNetPortRefScalarNet *)net)->netName();
               // std::cout << "inst: "<< instport << " conn: " << conn << std::endl;
-              m->addNetSymbol(std::string(inst_name) + "/" + instport, false, true);
+              m->addBusSymbol(std::string(inst_name) + "/" + instport, false, l, r);
               m->addSplitedPortConnection(module2, inst_name, instport, conn, isInput);
             } else {
               instport = std::string(inst_name) + "/" + instport;
-              m->addNetSymbol(instport, false, false);
+              m->addNetSymbol(instport, false);
               std::string conn = ((VerilogNetPortRefScalarNet *)net)->netName();
-              m->addNetSymbol(conn, false, false);
+              m->addNetSymbol(conn, false);
               if (isInput) { m->addConnection(instport, conn); }
-              else { m->addConnection(conn, instport); }
+              else         { m->addConnection(conn, instport); }
             }
         }
       }
@@ -1959,8 +1729,8 @@ VerilogReader::processModule(ModuleList &modulelist, VerilogModule *module) {
         if (netNames[item->pinIndex()]) {
           const char *pin = netNames[item->pinIndex()];
           std::string instport = std::string(inst_name) + "/" + port;
-          m->addNetSymbol(instport, false, false);
-          m->addNetSymbol(pin, false, false);
+          m->addNetSymbol(instport, false);
+          m->addNetSymbol(pin, false);
           if (item->direction()->isInput()) m->addConnection(pin, instport);
           else m->addConnection(instport, pin);
         }
