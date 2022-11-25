@@ -28,6 +28,7 @@
 #include "Network.hh"
 #include "VerilogNamespace.hh"
 #include "verilog/VerilogReaderPvt.hh"
+#include "verilog/NameMapping.hh"
 
 extern int
 VerilogParse_parse();
@@ -1703,6 +1704,7 @@ private:
   BindingMap map_;
 };
 
+using namespace NameResolve;
 Instance *
 VerilogReader::linkNetwork(const char *top_cell_name,
 			   bool make_black_boxes,
@@ -1712,6 +1714,37 @@ VerilogReader::linkNetwork(const char *top_cell_name,
     Cell *top_cell = network_->findCell(library_, top_cell_name);
     VerilogModule *module = this->module(top_cell);
     if (module) {
+      ModuleList modulelist(network_, this);
+      std::cout << "top module name: " << module->name() << std::endl;
+      modulelist.createModule(module->name(), module);
+            // modulelist.print();
+      // namemap(module);
+      // std::cout << "--------------------------------" << std::endl;
+
+      // modulelist.printRes(module, "u_cm3_dap_ahb_ap/dap_ahb_habort_o");
+      // modulelist.printRes(module, "u_cm3_sync_dbg_en/d_async_i");
+      // modulelist.printRes(module, "u_cm3_nvic/nvic_dbg_restarted_o");
+      // modulelist.printRes(module, "u_cm3_nvic/nvic_dbg_trans_o");
+      // modulelist.printRes(module, "u_cm3_nvic/nvic_dbg_reg_wr_o");
+      modulelist.printRes(module, "u_cm3_nvic/nvic_dbg_reg_addr_o");
+      // modulelist.printRes(module, "u_cm3_nvic/nvic_dbg_snapstall_o");
+      // modulelist.printRes(module, "u_cm3_nvic/nvic_trc_en_o");
+      // modulelist.printRes(module, "u_cm3_mpu/hreset_n");
+      // modulelist.printRes(module, "u_cm3_mpu/hclk");
+      // modulelist.printRes(module, "u_cm3_mpu/pclk");
+      // modulelist.printRes(module, "u_cm3_mpu/mpu_disable_i");
+      // modulelist.printRes(module, "u_cm3_mpu/ppb_hsel_i");
+      // modulelist.printRes(module, "u_cm3_mpu/ppb_hwrite_i");
+      // modulelist.printRes(module, "u_cm3_mpu/ppb_hsize_i");
+      // modulelist.printRes(module, "u_cm3_mpu/ppb_haddr_i");
+      // modulelist.printRes(module, "u_cm3_mpu/ppb_hprot_i");
+      // modulelist.printRes(module, "u_cm3_mpu/ppb_hwdata_i");
+      // modulelist.printRes(module, "u_cm3_mpu/ppb_hready_i");
+      // modulelist.printRes(module, "u_cm3_mpu/dpu_ahb_haddri_i");
+      // modulelist.printRes(module, "u_cm3_mpu/mtx_dpu_ahb_haddracci_i");
+      // modulelist.printRes(module, "u_cm3_mpu/dpu_ahb_hproti_i");
+      // modulelist.printRes(module, "u_cm3_mpu/dpu_ahb_htransi_i");
+      // modulelist.printRes(module, "u_cm3_mpu/mtx_mpu_ahb_hreadyouti_i");
       // Seed the recursion for expansion with the top level instance.
       Instance *top_instance = network_->makeInstance(top_cell, "", nullptr);
       VerilogBindingTbl bindings(zero_net_name_, one_net_name_);
