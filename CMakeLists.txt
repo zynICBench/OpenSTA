@@ -208,6 +208,7 @@ set(STA_SOURCE
   
   verilog/VerilogReader.cc
   verilog/VerilogWriter.cc
+  verilog/NameMapping.cc
   )
 
 # Source files.

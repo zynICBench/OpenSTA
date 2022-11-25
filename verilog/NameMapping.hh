@@ -4,6 +4,7 @@
 #include <unordered_map>
 #include <sstream>
 #include <iostream>
+#include "VerilogReaderPvt.hh"
 
 namespace sta {
 class VerilogModule;
@@ -44,7 +45,17 @@ public:
   };
 
   // ast access methods
+  Range getRange(VerilogDclBus* bus);
   bool portdir(std::string const & port) const;
+  void connectPin(std::string const & instname, VerilogNetPortRefScalarNet *pin, Module* submod); 
+  void connectBus(std::string const & instname, VerilogNetPortRef *bus, Module* submod, Cell *cell);
+
+  void processModuleInst(VerilogModuleInst* s);
+  void processLibertyInst(VerilogLibertyInst* s);
+  void processDeclaration(VerilogDcl* dcl);
+  void processAssign(VerilogAssign* s);
+  void processStmt(VerilogStmt* s);
+  void processModule();
 
   void addInstSymbol(std::string const &instname, std::string const &modname);
   void addNetSymbol(std::string const &netname, bool isPort);
@@ -102,7 +113,6 @@ public:
     processModule();
   }
 private:
-  void processModule();
   Module* instModule(std::string const & instname) const;
   Symbol &addSymbol(std::string const &name) {
     return symbols.insert({name, Symbol()}).first->second;
@@ -120,7 +130,11 @@ public:
     for (auto &s : symbols) {
       std::cout << "inst name: " << s.first << std::endl;
       // std::cout << "inst name cmp:  " << s.second.name << std::endl;
+      std::cout << "cmp name: " << s.second.name << std::endl;
+      std::cout << "module: " << s.second.moduleName << std::endl; 
       std::cout << "src: " << s.second.src << std::endl;
+      std::cout << "-----------------------------------------------------"  << std::endl;
+      
     }
   }
 };
@@ -138,6 +152,16 @@ public:
       x.second->print();
     }
   }
+  
+  void
+  printRes(VerilogModule* module, std::string const &path) const {
+      Module::StringVec res = findSource(module->name(), path);
+      while(!res.empty()) {
+        std::string tmp = res.back();
+        res.pop_back(); 
+        std::cout << path << " ----> " << tmp << std::endl;
+      }
+  }
   Module::StringVec
   findSource(std::string rootModule, std::string const &path) const {
     Module* root = getModule(rootModule);
@@ -146,9 +170,14 @@ public:
   Module *getModule(std::string modname) const {
     return modules.find(modname)->second;
   }
+
+  ModuleList(NetworkReader* nl, VerilogReader* rd) : network(nl), reader(rd) {}
 private:
   typedef std::unordered_map<std::string, Module *> Modules;
-  Modules modules;
+  Modules        modules;
+public:
+  NetworkReader* network;
+  VerilogReader* reader;
 };
 
 } // end namespace NameResolve

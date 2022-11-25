@@ -35,6 +35,7 @@
 #include "Stats.hh"
 #include "VerilogNamespace.hh"
 #include "verilog/VerilogReaderPvt.hh"
+#include "verilog/NameMapping.hh"
 
 extern int
 VerilogParse_parse();
@@ -1679,65 +1680,6 @@ private:
 // }
 
 using namespace NameResolve;
-void
-VerilogReader::processModule(ModuleList &modulelist, VerilogModule *module) {
-  if (modulelist.hasProcessed(module->name())) return;
-  Module *m = modulelist.createModule(module->name(), module);
-  for (auto &s : *module->ports()) {m->addNetSymbol(s->name(), true);}
-  for (auto &s : *module->stmts()) {
-    if (s->isModuleInst()) {
-      // find instance and module
-      const char *inst_name = ((VerilogModuleInst *)s)->instanceName();
-      const char *module_name = ((VerilogModuleInst *)s)->moduleName();
-      m->addInstSymbol(inst_name, module_name);
-      Cell *cell = network_->findAnyCell(module_name);
-      VerilogModule *module2 = this->module(cell);
-
-      VerilogNetSeq *netSeq = ((VerilogModuleInst *)s)->pins();
-      for (auto &net : *netSeq) {
-        if (net->isNamedPortRefScalarNet()) {
-            std::string instport = net->name();
-            bool isInput = modulelist.getPortDirection(module2, instport.c_str()) == Module::PORT_INPUT;
-
-            if (modulelist.isBus(module2, instport.c_str())) {
-              std::string conn = ((VerilogNetPortRefScalarNet *)net)->netName();
-              // std::cout << "inst: "<< instport << " conn: " << conn << std::endl;
-              m->addBusSymbol(std::string(inst_name) + "/" + instport, false, l, r);
-              m->addSplitedPortConnection(module2, inst_name, instport, conn, isInput);
-            } else {
-              instport = std::string(inst_name) + "/" + instport;
-              m->addNetSymbol(instport, false);
-              std::string conn = ((VerilogNetPortRefScalarNet *)net)->netName();
-              m->addNetSymbol(conn, false);
-              if (isInput) { m->addConnection(instport, conn); }
-              else         { m->addConnection(conn, instport); }
-            }
-        }
-      }
-      processModule(modulelist, module2);
-    }
-    else if (s->isLibertyInst()) {
-      const char *inst_name = ((VerilogModuleInst *)s)->instanceName();
-      const char **netNames = ((VerilogLibertyInst *)s)->netNames();
-      LibertyCell *cell = ((VerilogLibertyInst *)s)->cell();
-      m->addInstSymbol(inst_name, "");
-
-      auto iter = cell->portIterator();
-      while (iter->hasNext()) {
-        auto item = iter->next();
-        const char *port = item->name();
-        if (netNames[item->pinIndex()]) {
-          const char *pin = netNames[item->pinIndex()];
-          std::string instport = std::string(inst_name) + "/" + port;
-          m->addNetSymbol(instport, false);
-          m->addNetSymbol(pin, false);
-          if (item->direction()->isInput()) m->addConnection(pin, instport);
-          else m->addConnection(instport, pin);
-        }
-      }
-    }
-  }
-};
 
 void
 VerilogReader::cut_input(std::string path, VerilogStmt *s) {
@@ -1753,29 +1695,29 @@ VerilogModule *
 VerilogReader::namemap(VerilogModule *module) {
   for (auto &s : *module->stmts()) {
     if (s->isModuleInst()) {
-      // cut_input("u_cm3_sync_dbg_en/d_async_i", s);
-      // cut_input("u_cm3_nvic/nvic_dbg_restarted_o", s);
-      // cut_input("u_cm3_nvic/nvic_dbg_trans_o", s);
-      // cut_input("u_cm3_nvic/nvic_dbg_reg_wr_o", s);
+      cut_input("u_cm3_sync_dbg_en/d_async_i", s);
+      cut_input("u_cm3_nvic/nvic_dbg_restarted_o", s);
+      cut_input("u_cm3_nvic/nvic_dbg_trans_o", s);
+      cut_input("u_cm3_nvic/nvic_dbg_reg_wr_o", s);
       cut_input("u_cm3_nvic/nvic_dbg_reg_addr_o", s);
-      // cut_input("u_cm3_nvic/nvic_dbg_snapstall_o", s);
-      // cut_input("u_cm3_nvic/nvic_trc_en_o", s);
-      // cut_input("u_cm3_mpu/hreset_n", s);
-      // cut_input("u_cm3_mpu/hclk", s);
-      // cut_input("u_cm3_mpu/pclk", s);
-      // cut_input("u_cm3_mpu/mpu_disable_i", s);
-      // cut_input("u_cm3_mpu/ppb_hsel_i", s);
-      // cut_input("u_cm3_mpu/ppb_hwrite_i", s);
-      // cut_input("u_cm3_mpu/ppb_hsize_i", s);
-      // cut_input("u_cm3_mpu/ppb_haddr_i", s);
-      // cut_input("u_cm3_mpu/ppb_hprot_i", s);
-      // cut_input("u_cm3_mpu/ppb_hwdata_i", s);
-      // cut_input("u_cm3_mpu/ppb_hready_i", s);
-      // cut_input("u_cm3_mpu/dpu_ahb_haddri_i", s);
-      // cut_input("u_cm3_mpu/mtx_dpu_ahb_haddracci_i", s);
-      // cut_input("u_cm3_mpu/dpu_ahb_hproti_i", s);
-      // cut_input("u_cm3_mpu/dpu_ahb_htransi_i", s);
-      // cut_input("u_cm3_mpu/mtx_mpu_ahb_hreadyouti_i", s);
+      cut_input("u_cm3_nvic/nvic_dbg_snapstall_o", s);
+      cut_input("u_cm3_nvic/nvic_trc_en_o", s);
+      cut_input("u_cm3_mpu/hreset_n", s);
+      cut_input("u_cm3_mpu/hclk", s);
+      cut_input("u_cm3_mpu/pclk", s);
+      cut_input("u_cm3_mpu/mpu_disable_i", s);
+      cut_input("u_cm3_mpu/ppb_hsel_i", s);
+      cut_input("u_cm3_mpu/ppb_hwrite_i", s);
+      cut_input("u_cm3_mpu/ppb_hsize_i", s);
+      cut_input("u_cm3_mpu/ppb_haddr_i", s);
+      cut_input("u_cm3_mpu/ppb_hprot_i", s);
+      cut_input("u_cm3_mpu/ppb_hwdata_i", s);
+      cut_input("u_cm3_mpu/ppb_hready_i", s);
+      cut_input("u_cm3_mpu/dpu_ahb_haddri_i", s);
+      cut_input("u_cm3_mpu/mtx_dpu_ahb_haddracci_i", s);
+      cut_input("u_cm3_mpu/dpu_ahb_hproti_i", s);
+      cut_input("u_cm3_mpu/dpu_ahb_htransi_i", s);
+      cut_input("u_cm3_mpu/mtx_mpu_ahb_hreadyouti_i", s);
     }
   }
 }
@@ -1858,17 +1800,37 @@ VerilogReader::linkNetwork(const char *top_cell_name,
     VerilogModule *module = this->module(top_cell);
 
     if (module) {
-      ModuleList modulelist;
+      ModuleList modulelist(network_, this);
       std::cout << "top module name: " << module->name() << std::endl;
-      processModule(modulelist, module);
+      modulelist.createModule(module->name(), module);
       // modulelist.print();
-      // modulelist.findSource(module->name(), "u_cm3_dap_ahb_ap/dap_ahb_habort_o");
-      // modulelist.findSource(module->name(), "u_cm3_sync_dbg_en/d_async_i");
-      // modulelist.findSource(module->name(), "u_cm3_nvic/nvic_dbg_restarted_o");
-      // modulelist.findSource(module->name(), "u_cm3_nvic/nvic_dbg_trans_o");
-      // modulelist.findSource(module->name(), "u_cm3_nvic/nvic_dbg_reg_wr_o");
-      modulelist.findSource(module->name(), "u_cm3_nvic/nvic_dbg_reg_addr_o");
       // namemap(module);
+      // std::cout << "--------------------------------" << std::endl;
+
+      // modulelist.printRes(module, "u_cm3_dap_ahb_ap/dap_ahb_habort_o");
+      // modulelist.printRes(module, "u_cm3_sync_dbg_en/d_async_i");
+      // modulelist.printRes(module, "u_cm3_nvic/nvic_dbg_restarted_o");
+      // modulelist.printRes(module, "u_cm3_nvic/nvic_dbg_trans_o");
+      // modulelist.printRes(module, "u_cm3_nvic/nvic_dbg_reg_wr_o");
+      modulelist.printRes(module, "u_cm3_nvic/nvic_dbg_reg_addr_o");
+      // modulelist.printRes(module, "u_cm3_nvic/nvic_dbg_snapstall_o");
+      // modulelist.printRes(module, "u_cm3_nvic/nvic_trc_en_o");
+      // modulelist.printRes(module, "u_cm3_mpu/hreset_n");
+      // modulelist.printRes(module, "u_cm3_mpu/hclk");
+      // modulelist.printRes(module, "u_cm3_mpu/pclk");
+      // modulelist.printRes(module, "u_cm3_mpu/mpu_disable_i");
+      // modulelist.printRes(module, "u_cm3_mpu/ppb_hsel_i");
+      // modulelist.printRes(module, "u_cm3_mpu/ppb_hwrite_i");
+      // modulelist.printRes(module, "u_cm3_mpu/ppb_hsize_i");
+      // modulelist.printRes(module, "u_cm3_mpu/ppb_haddr_i");
+      // modulelist.printRes(module, "u_cm3_mpu/ppb_hprot_i");
+      // modulelist.printRes(module, "u_cm3_mpu/ppb_hwdata_i");
+      // modulelist.printRes(module, "u_cm3_mpu/ppb_hready_i");
+      // modulelist.printRes(module, "u_cm3_mpu/dpu_ahb_haddri_i");
+      // modulelist.printRes(module, "u_cm3_mpu/mtx_dpu_ahb_haddracci_i");
+      // modulelist.printRes(module, "u_cm3_mpu/dpu_ahb_hproti_i");
+      // modulelist.printRes(module, "u_cm3_mpu/dpu_ahb_htransi_i");
+      // modulelist.printRes(module, "u_cm3_mpu/mtx_mpu_ahb_hreadyouti_i");
       // Seed the recursion for expansion with the top level instance.
       Instance *top_instance = network_->makeInstance(top_cell, "", nullptr);
       VerilogBindingTbl bindings(zero_net_name_, one_net_name_);
