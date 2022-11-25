@@ -106,8 +106,6 @@ protected:
   char *sdfName(const Instance *inst);
 
 private:
-  DISALLOW_COPY_AND_ASSIGN(SdfWriter);
-
   char sdf_divider_;
   bool include_typ_;
   float timescale_;
@@ -422,10 +420,8 @@ SdfWriter::writeArcDelays(Edge *edge)
 {
   RiseFallMinMax delays;
   TimingArcSet *arc_set = edge->timingArcSet();
-  TimingArcSetArcIterator arc_iter(arc_set);
-  while (arc_iter.hasNext()) {
-    TimingArc *arc = arc_iter.next();
-    RiseFall *rf = arc->toTrans()->asRiseFall();
+  for (TimingArc *arc : arc_set->arcs()) {
+    RiseFall *rf = arc->toEdge()->asRiseFall();
     ArcDelay min_delay = graph_->arcDelay(edge, arc, arc_delay_min_index_);
     delays.setValue(rf, MinMax::min(), delayAsFloat(min_delay));
 
@@ -579,11 +575,9 @@ SdfWriter::writeCheck(Edge *edge,
   // Examine the arcs to see if the check requires clk or data edge specifiers.
   TimingArc *arcs[RiseFall::index_count][RiseFall::index_count] = 
     {{nullptr, nullptr}, {nullptr, nullptr}};
-  TimingArcSetArcIterator arc_iter(arc_set);
-  while (arc_iter.hasNext()) {
-    TimingArc *arc = arc_iter.next();
-    RiseFall *clk_rf = arc->fromTrans()->asRiseFall();
-    RiseFall *data_rf = arc->toTrans()->asRiseFall();;
+  for (TimingArc *arc : arc_set->arcs()) {
+    RiseFall *clk_rf = arc->fromEdge()->asRiseFall();
+    RiseFall *data_rf = arc->toEdge()->asRiseFall();;
     arcs[clk_rf->index()][data_rf->index()] = arc;
   }
 
@@ -595,11 +589,8 @@ SdfWriter::writeCheck(Edge *edge,
     writeEdgeCheck(edge, sdf_check, RiseFall::fallIndex(), arcs);
   else {
     // No special case; write all the checks with data and clock edge specifiers.
-    TimingArcSetArcIterator arc_iter(arc_set);
-    while (arc_iter.hasNext()) {
-      TimingArc *arc = arc_iter.next();
+    for (TimingArc *arc : arc_set->arcs())
       writeCheck(edge, arc, sdf_check, true, true);
-    }
   }
 }
 
@@ -662,7 +653,7 @@ SdfWriter::writeCheck(Edge *edge,
 
   if (use_data_edge)
     gzprintf(stream_, "(%s %s)",
-	     sdfEdge(arc->toTrans()),
+	     sdfEdge(arc->toEdge()),
 	     sdfPortName(to_pin));
   else
     gzprintf(stream_, "%s", sdfPortName(to_pin));
@@ -677,7 +668,7 @@ SdfWriter::writeCheck(Edge *edge,
 
   if (use_clk_edge)
     gzprintf(stream_, "(%s %s)",
-	     sdfEdge(arc->fromTrans()),
+	     sdfEdge(arc->fromEdge()),
 	     sdfPortName(from_pin));
   else
     gzprintf(stream_, "%s", sdfPortName(from_pin));

@@ -1031,6 +1031,34 @@ proc worst_clock_skew { args } {
 }
 
 ################################################################
+
+define_cmd_args "write_timing_model" {[-corner corner] \
+                                        [-library_name lib_name]\
+                                        [-cell_name cell_name]\
+                                        filename}
+
+proc write_timing_model { args } {
+  parse_key_args "write_timing_model" args \
+    keys {-library_name -cell_name -corner} flags {}
+  check_argc_eq1 "write_timing_model" $args
+
+  set filename [file nativename [lindex $args 0]]
+  if { [info exists keys(-cell_name)] } {
+    set cell_name $keys(-cell_name)
+  } else {
+    set cell_name [get_name [[top_instance] cell]]
+  }
+  if { [info exists keys(-library_name)] } {
+    set lib_name $keys(-library_name)
+  } else {
+    set lib_name $cell_name
+  }
+  set corner [parse_corner keys]
+  write_timing_model_cmd $lib_name $cell_name $filename $corner
+    
+}
+
+################################################################
 #
 # Helper functions
 #
@@ -1102,6 +1130,24 @@ proc report_clock_min_period { args } {
     }
     puts "[get_name $clk] period_min = [sta::format_time $min_period 2] fmax = [format %.2f $fmax]"
   }
+}
+
+
+################################################################
+
+# max slew slack / limit
+proc max_slew_check_slack_limit {} {
+  return [expr "[sta::max_slew_check_slack] / [sta::max_slew_check_limit]"]
+}
+
+# max cap slack / limit
+proc max_capacitance_check_slack_limit {} {
+  return [expr [sta::max_capacitance_check_slack] / [sta::max_capacitance_check_limit]]
+}
+
+# max fanout slack / limit
+proc max_fanout_check_slack_limit {} {
+  return [expr [sta::max_fanout_check_slack] / [sta::max_fanout_check_limit]]
 }
 
 # sta namespace end.

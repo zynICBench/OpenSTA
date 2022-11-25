@@ -16,7 +16,6 @@
 
 #include "CheckMaxSkews.hh"
 
-#include "DisallowCopyAssign.hh"
 #include "TimingRole.hh"
 #include "TimingArc.hh"
 #include "Liberty.hh"
@@ -37,9 +36,6 @@ public:
   virtual ~MaxSkewCheckVisitor() {}
   virtual void visit(MaxSkewCheck &check,
 		     const StaState *sta) = 0;
-
-private:
-  DISALLOW_COPY_AND_ASSIGN(MaxSkewCheckVisitor);
 };
 
 CheckMaxSkews::CheckMaxSkews(StaState *sta) :
@@ -66,8 +62,6 @@ public:
 		     const StaState *sta);
 
 private:
-  DISALLOW_COPY_AND_ASSIGN(MaxSkewChecksVisitor);
-
   MaxSkewCheckSeq &checks_;
 };
 
@@ -92,7 +86,6 @@ public:
 		     const StaState *sta);
 
 private:
-  DISALLOW_COPY_AND_ASSIGN(MaxSkewViolatorsVisititor);
   MaxSkewCheckSeq &checks_;
 };
 
@@ -130,8 +123,6 @@ public:
   MaxSkewCheck *minSlackCheck();
 
 private:
-  DISALLOW_COPY_AND_ASSIGN(MaxSkewSlackVisitor);
-
   MaxSkewCheck *min_slack_check_;
 };
 
@@ -195,11 +186,9 @@ CheckMaxSkews:: visitMaxSkewChecks(Vertex *vertex,
     if (edge->role() == TimingRole::skew()) {
       Vertex *ref_vertex = edge->from(graph);
       TimingArcSet *arc_set = edge->timingArcSet();
-      TimingArcSetArcIterator arc_iter(arc_set);
-      while (arc_iter.hasNext()) {
-	TimingArc *arc = arc_iter.next();
-	RiseFall *clk_rf = arc->fromTrans()->asRiseFall();
-	RiseFall *ref_rf = arc->toTrans()->asRiseFall();
+      for (TimingArc *arc : arc_set->arcs()) {
+	RiseFall *clk_rf = arc->fromEdge()->asRiseFall();
+	RiseFall *ref_rf = arc->toEdge()->asRiseFall();
 	VertexPathIterator clk_path_iter(vertex, clk_rf, clk_min_max, search);
 	while (clk_path_iter.hasNext()) {
 	  PathVertex *clk_path = clk_path_iter.next();

@@ -19,7 +19,6 @@
 #include <stdarg.h>
 #include <ctype.h>
 
-#include "DisallowCopyAssign.hh"
 #include "Error.hh"
 #include "Report.hh"
 #include "MinMax.hh"
@@ -48,8 +47,6 @@ public:
   bool hasValue() const;
 
 private:
-  DISALLOW_COPY_AND_ASSIGN(SdfTriple);
-
   float *values_[3];
 };
 
@@ -70,8 +67,6 @@ public:
   const char *cond() const { return cond_; }
 
 private:
-  DISALLOW_COPY_AND_ASSIGN(SdfPortSpec);
-
   Transition *tr_;
   const char *port_;
   const char *cond_;   // timing checks only
@@ -275,14 +270,12 @@ SdfReader::setEdgeDelays(Edge *edge,
   if (triple_count == 1
       || triple_count == 2) {
     TimingArcSet *arc_set = edge->timingArcSet();
-    TimingArcSetArcIterator arc_iter(arc_set);
-    while (arc_iter.hasNext()) {
-      TimingArc *arc = arc_iter.next();
+    for (TimingArc *arc : arc_set->arcs()) {
       size_t triple_index;
       if (triple_count == 1)
 	triple_index = 0;
       else
-	triple_index = arc->toTrans()->sdfTripleIndex();
+	triple_index = arc->toEdge()->sdfTripleIndex();
       SdfTriple *triple = (*triples)[triple_index];
       setEdgeArcDelays(edge, arc, triple);
     }
@@ -384,12 +377,10 @@ SdfReader::iopath(SdfPortSpec *from_edge,
                     // condelse matches the default (unconditional) arc.
                     || (condelse && lib_cond == nullptr))) {
               matched = true;
-              TimingArcSetArcIterator arc_iter(arc_set);
-              while (arc_iter.hasNext()) {
-                TimingArc *arc = arc_iter.next();
+              for (TimingArc *arc : arc_set->arcs()) {
                 if ((from_edge->transition() == Transition::riseFall())
-                    || (arc->fromTrans() == from_edge->transition())) {
-                  size_t triple_index = arc->toTrans()->sdfTripleIndex();
+                    || (arc->fromEdge() == from_edge->transition())) {
+                  size_t triple_index = arc->toEdge()->sdfTripleIndex();
                   SdfTriple *triple = nullptr;
                   if (triple_index < triple_count)
                     triple = (*triples)[triple_index];
@@ -528,13 +519,11 @@ SdfReader::annotateCheckEdges(Pin *data_pin,
 	       && edge_role->genericRole() == sdf_role->genericRole()))
 	  && cond_matches) {
 	TimingArcSet *arc_set = edge->timingArcSet();
-	TimingArcSetArcIterator arc_iter(arc_set);
-	while (arc_iter.hasNext()) {
-	  TimingArc *arc = arc_iter.next();
+        for (TimingArc *arc : arc_set->arcs()) {
 	  if (((data_edge->transition() == Transition::riseFall())
-	       || (arc->toTrans() == data_edge->transition()))
+	       || (arc->toEdge() == data_edge->transition()))
 	      && ((clk_edge->transition() == Transition::riseFall())
-		  || (arc->fromTrans() == clk_edge->transition()))) {
+		  || (arc->fromEdge() == clk_edge->transition()))) {
 	    setEdgeArcDelays(edge, arc, triple);
 	  }
 	}

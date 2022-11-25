@@ -18,7 +18,6 @@
 
 #include <string>
 
-#include "DisallowCopyAssign.hh"
 #include "StringSeq.hh"
 #include "LibertyClass.hh"
 #include "NetworkClass.hh"
@@ -627,6 +626,17 @@ public:
 		 Slew &slew,
 		 float &limit,
 		 float &slack);
+  void maxSlewCheck(// Return values.
+                    Pin *&pin,
+                    Slew &slew,
+                    float &slack,
+                    float &limit);
+  void findSlewLimit(const LibertyPort *port,
+                     const Corner *corner,
+                     const MinMax *min_max,
+                     // Return values.
+                     float &limit,
+                     bool &exists);
 
   void checkFanoutLimitPreamble();
   // Return pins with the min/max fanout limit slack.
@@ -647,6 +657,11 @@ public:
 		   float &fanout,
 		   float &limit,
 		   float &slack);
+  void maxFanoutCheck(// Return values.
+                      Pin *&pin,
+                      float &fanout,
+                      float &slack,
+                      float &limit);
 
   void checkCapacitanceLimitPreamble();
   // Return pins with the min/max slew limit slack.
@@ -673,6 +688,11 @@ public:
 			float &capacitance,
 			float &limit,
 			float &slack);
+  void maxCapacitanceCheck(// Return values.
+                           Pin *&pin,
+                           float &capacitance,
+                           float &slack,
+                           float &limit);
 
   // Min pulse width check with the least slack.
   // corner=nullptr checks all corners.
@@ -936,6 +956,7 @@ public:
 			   const MinMax *min_max);
   // Worst endpoint slack and vertex.
   // Incrementally updated.
+  Slack worstSlack(const MinMax *min_max);
   void worstSlack(const MinMax *min_max,
 		  // Return values.
 		  Slack &worst_slack,
@@ -985,6 +1006,8 @@ public:
   Arrival vertexArrival(Vertex *vertex,
 			const RiseFall *rf,
 			const PathAnalysisPt *path_ap);
+  Arrival vertexArrival(Vertex *vertex,
+                        const MinMax *min_max);
   Required vertexRequired(Vertex *vertex,
 			  const MinMax *min_max);
   Required vertexRequired(Vertex *vertex,
@@ -1243,6 +1266,12 @@ public:
 	     const Corner *corner,
 	     // Return values.
 	     PowerResult &result);
+  PwrActivity findClkedActivity(const Pin *pin);
+
+  void writeTimingModel(const char *lib_name,
+                        const char *cell_name,
+                        const char *filename,
+                        const Corner *corner);
 
   // Find equivalent cells in equiv_libs.
   // Optionally add mappings for cells in map_libs.
@@ -1368,6 +1397,7 @@ protected:
   void ensureGraphSdcAnnotated();
   CornerSeq makeCornerSeq(Corner *corner) const;
   void makeParasiticAnalysisPts();
+  void clkSkewPreamble();
 
   CmdNamespace cmd_namespace_;
   Instance *current_instance_;
@@ -1392,9 +1422,6 @@ protected:
 
   // Singleton sta used by tcl command interpreter.
   static Sta *sta_;
-
-private:
-  DISALLOW_COPY_AND_ASSIGN(Sta);
 };
 
 } // namespace

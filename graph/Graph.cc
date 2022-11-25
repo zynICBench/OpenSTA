@@ -16,7 +16,6 @@
 
 #include "Graph.hh"
 
-#include "DisallowCopyAssign.hh"
 #include "Debug.hh"
 #include "Stats.hh"
 #include "MinMax.hh"
@@ -49,14 +48,18 @@ Graph::Graph(StaState *sta,
   have_arc_delays_(have_arc_delays),
   ap_count_(ap_count),
   width_check_annotations_(nullptr),
-  period_check_annotations_(nullptr)
+  period_check_annotations_(nullptr),
+  reg_clk_vertices_(new VertexSet(graph_))
 {
+  // For the benifit of reg_clk_vertices_ that references graph_.
+  graph_ = this;
 }
 
 Graph::~Graph()
 {
   delete vertices_;
   delete edges_;
+  delete reg_clk_vertices_;
   deleteSlewTables();
   deleteArcDelayTables();
   removeWidthCheckAnnotations();
@@ -112,9 +115,6 @@ protected:
   int &bidirect_count_;
   int &load_count_;
   const Network *network_;
-
-private:
-  DISALLOW_COPY_AND_ASSIGN(FindNetDrvrLoadCounts);
 };
 
 FindNetDrvrLoadCounts::FindNetDrvrLoadCounts(Pin *drvr_pin,
@@ -185,9 +185,7 @@ Graph::makePortInstanceEdges(const Instance *inst,
 			     LibertyCell *cell,
 			     LibertyPort *from_to_port)
 {
-  LibertyCellTimingArcSetIterator timing_iter(cell);
-  while (timing_iter.hasNext()) {
-    TimingArcSet *arc_set = timing_iter.next();
+  for (TimingArcSet *arc_set : cell->timingArcSets()) {
     LibertyPort *from_port = arc_set->from();
     LibertyPort *to_port = arc_set->to();
     if ((from_to_port == nullptr
@@ -308,7 +306,6 @@ public:
   MakeEdgesThruHierPin(Graph *graph);
 
 private:
-  DISALLOW_COPY_AND_ASSIGN(MakeEdgesThruHierPin);
   virtual void visit(Pin *drvr,
 		     Pin *load);
 
@@ -401,7 +398,7 @@ Graph::makeVertex(Pin *pin,
   vertex->init(pin, is_bidirect_drvr, is_reg_clk);
   makeVertexSlews(vertex);
   if (is_reg_clk)
-    reg_clk_vertices_.insert(vertex);
+    reg_clk_vertices_->insert(vertex);
   return vertex;
 }
 
@@ -437,7 +434,7 @@ void
 Graph::deleteVertex(Vertex *vertex)
 {
   if (vertex->isRegClk())
-    reg_clk_vertices_.erase(vertex);
+    reg_clk_vertices_->erase(vertex);
   Pin *pin = vertex->pin_;
   if (vertex->isBidirectDriver())
     pin_bidirect_drvr_vertex_map_.erase(pin_bidirect_drvr_vertex_map_
@@ -876,9 +873,7 @@ Graph::removeDelayAnnotated(Edge *edge)
 {
   edge->setDelayAnnotationIsIncremental(false);
   TimingArcSet *arc_set = edge->timingArcSet();
-  TimingArcSetArcIterator arc_iter(arc_set);
-  while (arc_iter.hasNext()) {
-    TimingArc *arc = arc_iter.next();
+  for (TimingArc *arc : arc_set->arcs()) {
     for (DcalcAPIndex ap_index = 0; ap_index < ap_count_; ap_index++) {
       setArcDelayAnnotated(edge, arc, ap_index, false);
     }
@@ -889,9 +884,7 @@ bool
 Graph::delayAnnotated(Edge *edge)
 {
   TimingArcSet *arc_set = edge->timingArcSet();
-  TimingArcSetArcIterator arc_iter(arc_set);
-  while (arc_iter.hasNext()) {
-    TimingArc *arc = arc_iter.next();
+  for (TimingArc *arc : arc_set->arcs()) {
     for (DcalcAPIndex ap_index = 0; ap_index < ap_count_; ap_index++) {
       if (arcDelayAnnotated(edge, arc, ap_index))
 	return true;
@@ -1602,6 +1595,25 @@ EdgesThruHierPinIterator::EdgesThruHierPinIterator(const Pin *hpin,
   FindEdgesThruHierPinVisitor visitor(edges_, graph);
   visitDrvrLoadsThruHierPin(hpin, network, &visitor);
   edge_iter_.init(edges_);
+}
+
+////////////////////////////////////////////////////////////////
+
+VertexIdLess::VertexIdLess(Graph *&graph) :
+  graph_(graph)
+{
+}
+
+bool
+VertexIdLess::operator()(const Vertex *vertex1,
+                         const Vertex *vertex2) const
+{
+  return graph_->id(vertex1) < graph_->id(vertex2);
+}
+
+VertexSet::VertexSet(Graph *&graph) :
+  Set<Vertex*, VertexIdLess>(VertexIdLess(graph))
+{
 }
 
 } // namespace

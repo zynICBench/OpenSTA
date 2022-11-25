@@ -220,7 +220,8 @@ public:
 			   const RiseFall *rf,
 			   const MinMax *min_max,
  			   const PathAnalysisPt *path_ap,
-			   bool is_segment_start);
+			   bool is_segment_start,
+                           bool require_exception);
   Tag *fromRegClkTag(const Pin *from_pin,
 		     const RiseFall *from_rf,
 		     Clock *clk,
@@ -265,7 +266,10 @@ public:
   bool arrivalsAtEndpointsExist()const{return arrivals_at_endpoints_exist_;}
   bool makeUnclkedPaths(Vertex *vertex,
 			bool is_segment_start,
+                        bool require_exception,
 			TagGroupBldr *tag_bldr);
+  bool makeUnclkedPaths2(Vertex *vertex,
+                         TagGroupBldr *tag_bldr);
   bool isSegmentStart(const Pin *pin);
   bool isInputArrivalSrchStart(Vertex *vertex);
   void seedInputSegmentArrival(const Pin *pin,
@@ -336,8 +340,6 @@ public:
  			Vertex *vertex,
  			TagGroupBldr *tag_bldr);
   void ensureDownstreamClkPins();
-  bool pathPropagatedToClkSrc(const Pin *pin,
-			      Path *path);
   // Check paths from inputs from the default arrival clock
   // (missing set_input_delay).
   virtual bool checkDefaultArrivalPaths() { return true; }
@@ -348,6 +350,10 @@ public:
   GatedClk *gatedClk() { return gated_clk_; }
   Genclks *genclks() { return genclks_; }
   void findClkVertexPins(PinSet &clk_pins);
+  void findFilteredArrivals(ExceptionFrom *from,
+                            ExceptionThruSeq *thrus,
+                            ExceptionTo *to,
+                            bool unconstrained);
 
 protected:
   void init(StaState *sta);
@@ -548,15 +554,15 @@ protected:
   // Requireds have been seeded by searching arrivals to all endpoints.
   bool requireds_seeded_;
   // Vertices with invalid arrival times to update and search from.
-  VertexSet invalid_arrivals_;
+  VertexSet *invalid_arrivals_;
   std::mutex invalid_arrivals_lock_;
   BfsFwdIterator *arrival_iter_;
   // Vertices with invalid required times to update and search from.
-  VertexSet invalid_requireds_;
+  VertexSet *invalid_requireds_;
   BfsBkwdIterator *required_iter_;
   bool tns_exists_;
   // Endpoint vertices with slacks that have changed since tns was found.
-  VertexSet invalid_tns_;
+  VertexSet *invalid_tns_;
   // Indexed by path_ap->index().
   SlackSeq tns_;
   // Indexed by path_ap->index().
@@ -585,7 +591,7 @@ protected:
   TagGroupIndex tag_group_capacity_;
   std::mutex tag_group_lock_;
   // Latches data outputs to queue on the next search pass.
-  VertexSet pending_latch_outputs_;
+  VertexSet *pending_latch_outputs_;
   std::mutex pending_latch_outputs_lock_;
   VertexSet *endpoints_;
   VertexSet *invalid_endpoints_;
@@ -627,14 +633,11 @@ class ClkArrivalSearchPred : public EvalPred
 public:
   ClkArrivalSearchPred(const StaState *sta);
   virtual bool searchThru(Edge *edge);
-
-private:
-  DISALLOW_COPY_AND_ASSIGN(ClkArrivalSearchPred);
 };
 
 // Class for visiting fanin/fanout paths of a vertex.
 // This used by forward/backward search to find arrival/required path times.
-class PathVisitor : public VertexVisitor
+class PathVisitor : public VertexVisitor, public StaState
 {
 public:
   // Uses search->evalPred() for search predicate.
@@ -688,7 +691,6 @@ protected:
 			       const MinMax *min_max,
 			       const PathAnalysisPt *path_ap) = 0;
   SearchPred *pred_;
-  const StaState *sta_;
 };
 
 // Visitor called during forward search to record an
@@ -812,9 +814,6 @@ protected:
 			   Search *search);
 
   TagGroupBldr *tag_bldr_;
-
-private:
-  DISALLOW_COPY_AND_ASSIGN(DynLoopSrchPred);
 };
 
 } // namespace

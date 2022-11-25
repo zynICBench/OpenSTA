@@ -18,7 +18,6 @@
 
 #include <algorithm>
 
-#include "DisallowCopyAssign.hh"
 #include "MinMax.hh"
 #include "TimingRole.hh"
 #include "Units.hh"
@@ -608,7 +607,18 @@ PathDelay::mergeable(ExceptionPath *exception) const
   return ExceptionPath::mergeable(exception)
     && overrides(exception)
     && exception->ignoreClkLatency() == ignore_clk_latency_
-    && exception->delay() == delay_;
+    && exception->delay() == delay_
+    // path delays -to pin/inst may be along the same path because they
+    // can be internal pins and not restricted to normal endpoints.
+    // This means that
+    //   set_max_delay -to p1
+    //   set_max_delay -to p2
+    // is not the same as
+    //   set_max_delay -to {p1 p2}
+    // when p1 and p2 are on the same path because once endpoint
+    // is encountered the exception is not complete.
+    && to_ == nullptr
+    && exception->to() == nullptr;
 }
 
 bool
@@ -1463,6 +1473,23 @@ ExceptionTo::matches(const Pin *pin,
     || (pins_ == nullptr
 	&& clks_ == nullptr
 	&& insts_ == nullptr
+	&& end_rf_->matches(end_rf));
+}
+
+bool
+ExceptionTo::matches(const Pin *pin,
+ 		     const RiseFall *end_rf,
+		     const Network *network) const
+{
+  return (pins_
+	  && pins_->hasKey(const_cast<Pin*>(pin))
+	  && rf_->matches(end_rf)
+	  && end_rf_->matches(end_rf))
+    || (insts_
+	&& insts_->hasKey(network->instance(pin))
+	&& (network->direction(pin)->isAnyInput()
+            || network->direction(pin)->isInternal())
+	&& rf_->matches(end_rf)
 	&& end_rf_->matches(end_rf));
 }
 
@@ -2458,9 +2485,6 @@ protected:
 
   PinPairSet *pairs_;
   const Network *network_;
-
-private:
-  DISALLOW_COPY_AND_ASSIGN(InsertPinPairsThru);
 };
 
 InsertPinPairsThru::InsertPinPairsThru(PinPairSet *pairs,
@@ -2512,9 +2536,6 @@ protected:
 
   PinPairSet *pairs_;
   const Network *network_;
-
-private:
-  DISALLOW_COPY_AND_ASSIGN(DeletePinPairsThru);
 };
 
 DeletePinPairsThru::DeletePinPairsThru(PinPairSet *pairs,

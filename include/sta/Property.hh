@@ -51,8 +51,9 @@ public:
   PropertyValue();
   PropertyValue(const char *value);
   PropertyValue(string &value);
-  PropertyValue(float value);
-  PropertyValue(bool value);
+  PropertyValue(float value,
+                const Unit *unit);
+  explicit PropertyValue(bool value);
   PropertyValue(Library *value);
   PropertyValue(Cell *value);
   PropertyValue(Port *value);
@@ -75,6 +76,8 @@ public:
   PropertyValue(PropertyValue &&props);
   ~PropertyValue();
   Type type() const { return type_; }
+  const Unit *unit() const { return unit_; }
+
   const char *stringValue() const { return string_; }
   float floatValue() const { return float_; }
   bool boolValue() const { return bool_; }
@@ -92,6 +95,7 @@ public:
   ClockSeq *clocks() const { return clks_; }
   PathRefSeq *pathRefs() const { return path_refs_; }
   PwrActivity pwrActivity() const { return pwr_activity_; }
+
   // Copy assignment.
   PropertyValue &operator=(const PropertyValue &);
   // Move assignment.
@@ -118,6 +122,7 @@ private:
     PathRefSeq *path_refs_;
     PwrActivity pwr_activity_;
   };
+  const Unit *unit_;
 };
 
 PropertyValue

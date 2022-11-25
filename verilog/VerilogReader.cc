@@ -95,8 +95,6 @@ public:
   bool warn() const { return warn_; }
 
 private:
-  DISALLOW_COPY_AND_ASSIGN(VerilogError);
-
   int id_;
   const char *filename_;
   int line_;
@@ -1046,9 +1044,6 @@ public:
   VerilogNullNetNameIterator() {}
   virtual bool hasNext() { return false; }
   virtual const char *next() { return nullptr; }
-
-private:
-  DISALLOW_COPY_AND_ASSIGN(VerilogNullNetNameIterator);
 };
 
 class VerilogOneNetNameIterator : public VerilogNetNameIterator
@@ -1060,9 +1055,6 @@ public:
 
 protected:
   const char *name_;
-
-private:
-  DISALLOW_COPY_AND_ASSIGN(VerilogOneNetNameIterator);
 };
 
 VerilogOneNetNameIterator::VerilogOneNetNameIterator(const char *name) :
@@ -1098,9 +1090,6 @@ protected:
   int from_index_;
   int to_index_;
   int index_;
-
-private:
-  DISALLOW_COPY_AND_ASSIGN(VerilogBusNetNameIterator);
 };
 
 VerilogBusNetNameIterator::VerilogBusNetNameIterator(const char *bus_name,
@@ -1154,8 +1143,6 @@ public:
   virtual const char *next();
 
 private:
-  DISALLOW_COPY_AND_ASSIGN(VerilogConstantNetNameIterator);
-
   VerilogConstantValue *value_;
   const char *zero_;
   const char *one_;
@@ -1196,8 +1183,6 @@ public:
   virtual const char *next();
 
 private:
-  DISALLOW_COPY_AND_ASSIGN(VerilogNetConcatNameIterator);
-
   VerilogModule *module_;
   VerilogReader *reader_;
   VerilogNetSeq::Iterator net_iter_;
@@ -1657,8 +1642,6 @@ public:
             Net *net);
 
 private:
-  DISALLOW_COPY_AND_ASSIGN(VerilogBindingTbl);
-
   const char *zero_net_name_;
   const char *one_net_name_;
   BindingMap map_;
@@ -1862,12 +1845,12 @@ VerilogReader::linkNetwork(const char *top_cell_name,
         return top_instance;
     }
     else {
-      report->error(162, "%s is not a verilog module.", top_cell_name);
+      report->error(190, "%s is not a verilog module.", top_cell_name);
       return nullptr;
     }
   }
   else {
-    report->error(163, "%s is not a verilog module.", top_cell_name);
+    report->error(191, "%s is not a verilog module.", top_cell_name);
     return nullptr;
   }
 }

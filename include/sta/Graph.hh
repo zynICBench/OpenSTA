@@ -18,7 +18,6 @@
 
 #include <mutex>
 
-#include "DisallowCopyAssign.hh"
 #include "Iterator.hh"
 #include "Map.hh"
 #include "Vector.hh"
@@ -200,7 +199,7 @@ public:
 				float period);
   // Remove all delay and slew annotations.
   void removeDelaySlewAnnotations();
-  VertexSet *regClkVertices() { return &reg_clk_vertices_; }
+  VertexSet *regClkVertices() { return reg_clk_vertices_; }
 
   static const int vertex_level_bits = 24;
   static const int vertex_level_max = (1<<vertex_level_bits)-1;
@@ -262,16 +261,13 @@ protected:
   // Sdf period check annotations.
   PeriodCheckAnnotations *period_check_annotations_;
   // Register/latch clock vertices to search from.
-  VertexSet reg_clk_vertices_;
+  VertexSet *reg_clk_vertices_;
 
   friend class Vertex;
   friend class VertexIterator;
   friend class VertexInEdgeIterator;
   friend class VertexOutEdgeIterator;
   friend class MakeEdgesThruHierPin;
-
-private:
-  DISALLOW_COPY_AND_ASSIGN(Graph);
 };
 
 // Each Vertex corresponds to one network pin.
@@ -388,8 +384,6 @@ protected:
   unsigned object_idx_:VertexTable::idx_bits;
 
 private:
-  DISALLOW_COPY_AND_ASSIGN(Vertex);
-
   friend class Graph;
   friend class Edge;
   friend class VertexInEdgeIterator;
@@ -459,8 +453,6 @@ protected:
   unsigned object_idx_:VertexTable::idx_bits;
 
 private:
-  DISALLOW_COPY_AND_ASSIGN(Edge);
-
   friend class Graph;
   friend class GraphDelays1;
   friend class GraphSlewsDelays1;
@@ -479,7 +471,6 @@ public:
   virtual Vertex *next();
 
 private:
-  DISALLOW_COPY_AND_ASSIGN(VertexIterator);
   bool findNextPin();
   void findNext();
 
@@ -503,8 +494,6 @@ public:
   Edge *next();
 
 private:
-  DISALLOW_COPY_AND_ASSIGN(VertexInEdgeIterator);
-
   Edge *next_;
   const Graph *graph_;
 };
@@ -518,8 +507,6 @@ public:
   Edge *next();
 
 private:
-  DISALLOW_COPY_AND_ASSIGN(VertexOutEdgeIterator);
-
   Edge *next_;
   const Graph *graph_;
 };
@@ -535,10 +522,26 @@ public:
   virtual Edge *next() { return edge_iter_.next(); }
 
 private:
-  DISALLOW_COPY_AND_ASSIGN(EdgesThruHierPinIterator);
-
   EdgeSet edges_;
   EdgeSet::Iterator edge_iter_;
+};
+
+class VertexIdLess
+{
+public:
+  VertexIdLess(Graph *&graph);
+  bool operator()(const Vertex *vertex1,
+		  const Vertex *vertex2) const;
+
+private:
+  Graph *&graph_;
+};
+
+class VertexSet : public Set<Vertex*, VertexIdLess>
+{
+public:
+  VertexSet(Graph *&graph);
+  VertexSet(const VertexSet &set);
 };
 
 } // namespace

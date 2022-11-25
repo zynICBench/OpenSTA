@@ -18,7 +18,6 @@
 
 #include <mutex>
 
-#include "DisallowCopyAssign.hh"
 #include "StringUtil.hh"
 #include "StringSet.hh"
 #include "Map.hh"
@@ -476,7 +475,7 @@ public:
   void removeClockGroupsAsynchronous(const char *name);
   bool sameClockGroup(const Clock *clk1,
 		      const Clock *clk2);
- // Clocks explicitly excluded by set_clock_group.
+  // Clocks explicitly excluded by set_clock_group.
   bool sameClockGroupExplicit(const Clock *clk1,
 			      const Clock *clk2);
   ClockGroupIterator *clockGroupIterator();
@@ -532,7 +531,7 @@ public:
 		     const MinMaxAll *min_max,
 		     bool add, float delay);
   void removeInputDelay(Pin *pin,
-			RiseFallBoth *rf,
+			const RiseFallBoth *rf,
 			Clock *clk,
 			RiseFall *clk_rf,
 			MinMaxAll *min_max);
@@ -741,8 +740,6 @@ public:
   Clock *findClock(const char *name) const;
   virtual void findClocksMatching(PatternMatch *pattern,
 				  ClockSeq *clks) const;
-  // Wireload set by set_wire_load_model or default library default_wire_load.
-  Wireload *wireloadDefaulted(const MinMax *min_max);
   Wireload *wireload(const MinMax *min_max);
   void setWireload(Wireload *wireload,
 		   const MinMaxAll *min_max);
@@ -949,11 +946,10 @@ public:
 			ExceptionStateSet *&states) const;
   // Return hierarchical -thru exceptions that start between
   // from_pin and to_pin.
-  void exceptionThruStates(const Pin *from_pin,
-			   const Pin *to_pin,
-			   const RiseFall *to_rf,
-			   const MinMax *min_max,
-			   ExceptionStateSet *&states) const;
+  ExceptionStateSet *exceptionThruStates(const Pin *from_pin,
+                                         const Pin *to_pin,
+                                         const RiseFall *to_rf,
+                                         const MinMax *min_max) const;
   // Find the highest priority exception with first exception pt at
   // pin/clk end.
   void exceptionTo(ExceptionPathType type,
@@ -979,6 +975,10 @@ public:
 		    const MinMax *min_max,
 		    bool match_min_max_exactly,
 		    bool require_to_pin) const;
+  bool isCompleteTo(ExceptionState *state,
+                    const Pin *pin,
+                    const RiseFall *rf,
+                    const MinMax *min_max) const;
   bool isPathDelayInternalStartpoint(const Pin *pin) const;
   PinSet *pathDelayInternalStartpoints() const;
   bool isPathDelayInternalEndpoint(const Pin *pin) const;
@@ -1392,8 +1392,6 @@ protected:
   EdgeClockLatencyMap edge_clk_latency_;
 
 private:
-  DISALLOW_COPY_AND_ASSIGN(Sdc);
-
   friend class WriteSdc;
   friend class FindNetCaps;
   friend class ClockGroupIterator;
@@ -1407,8 +1405,8 @@ public:
 
 private:
   ClockIterator(ClockSeq &clocks);
+
   friend class Sdc;
-  DISALLOW_COPY_AND_ASSIGN(ClockIterator);
 };
 
 class ClockGroupIterator : public ClockGroupsNameMap::Iterator
@@ -1420,7 +1418,6 @@ private:
   ClockGroupIterator(ClockGroupsNameMap &clk_groups_name_map);
 
   friend class Sdc;
-  DISALLOW_COPY_AND_ASSIGN(ClockGroupIterator);
 };
 
 class GroupPathIterator : public GroupPathMap::Iterator
@@ -1432,7 +1429,6 @@ private:
   GroupPathIterator(GroupPathMap &group_path_map);
 
   friend class Sdc;
-  DISALLOW_COPY_AND_ASSIGN(GroupPathIterator);
 };
 
 } // namespace

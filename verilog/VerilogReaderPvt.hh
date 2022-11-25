@@ -16,7 +16,6 @@
 
 #pragma once
 
-#include "DisallowCopyAssign.hh"
 #include "Zlib.hh"
 #include "Vector.hh"
 #include "Map.hh"
@@ -187,7 +186,6 @@ public:
   netVerilogName(const char *net_name);
 
 protected:
-  DISALLOW_COPY_AND_ASSIGN(VerilogReader);
   void init(const char *filename);
   void makeCellPorts(Cell *cell,
 		     VerilogModule *module,
@@ -335,8 +333,6 @@ public:
   int line() const { return line_; }
 
 private:
-  DISALLOW_COPY_AND_ASSIGN(VerilogStmt);
-
   int line_;
 };
 
@@ -360,7 +356,6 @@ public:
 		VerilogReader *reader);
 
 private:
-  DISALLOW_COPY_AND_ASSIGN(VerilogModule);
   void parseStmts(VerilogReader *reader);
   void checkInstanceName(VerilogInst *inst,
 			 StringSet &inst_names,
@@ -393,8 +388,6 @@ public:
   void check();
 
 private:
-  DISALLOW_COPY_AND_ASSIGN(VerilogDcl);
-
   PortDirection *dir_;
   VerilogDclArgSeq *args_;
 };
@@ -418,8 +411,6 @@ public:
   virtual int size() const;
 
 private:
-  DISALLOW_COPY_AND_ASSIGN(VerilogDclBus);
-
   int from_index_;
   int to_index_;
 };
@@ -435,8 +426,6 @@ public:
   VerilogAssign *assign() { return assign_; }
 
 private:
-  DISALLOW_COPY_AND_ASSIGN(VerilogDclArg);
-
   const char *net_name_;
   VerilogAssign *assign_;
 };
@@ -454,8 +443,6 @@ public:
   VerilogNet *rhs() const { return rhs_; }
 
 private:
-  DISALLOW_COPY_AND_ASSIGN(VerilogAssign);
-
   VerilogNet *lhs_;
   VerilogNet *rhs_;
 };
@@ -471,8 +458,6 @@ public:
   void setInstanceName(const char *inst_name);
 
 private:
-  DISALLOW_COPY_AND_ASSIGN(VerilogInst);
-
   const char *inst_name_;
 };
 
@@ -491,8 +476,6 @@ public:
   bool hasPins();
 
 private:
-  DISALLOW_COPY_AND_ASSIGN(VerilogModuleInst);
-
   const char *module_name_;
   VerilogNetSeq *pins_;
 };
@@ -513,8 +496,6 @@ public:
   const char **netNames() const { return net_names_; }
 
 private:
-  DISALLOW_COPY_AND_ASSIGN(VerilogLibertyInst);
-
   LibertyCell *cell_;
   const char **net_names_;
 };
@@ -534,7 +515,6 @@ public:
 					       VerilogReader *reader) = 0;
 
 private:
-  DISALLOW_COPY_AND_ASSIGN(VerilogNet);
 };
 
 class VerilogNetUnnamed : public VerilogNet
@@ -543,9 +523,6 @@ public:
   VerilogNetUnnamed() {}
   virtual bool isNamed() { return false; }
   virtual const char *name() { return nullptr; }
-
-private:
-  DISALLOW_COPY_AND_ASSIGN(VerilogNetUnnamed);
 };
 
 class VerilogNetNamed : public VerilogNet
@@ -561,9 +538,6 @@ public:
 
 protected:
   const char *name_;
-
-private:
-  DISALLOW_COPY_AND_ASSIGN(VerilogNetNamed);
 };
 
 // Named net reference, which could be the name of a scalar or bus signal.
@@ -575,9 +549,6 @@ public:
   virtual int size(VerilogModule *module);
   virtual VerilogNetNameIterator *nameIterator(VerilogModule *module,
 					       VerilogReader *reader);
-
-private:
-  DISALLOW_COPY_AND_ASSIGN(VerilogNetScalar);
 };
 
 class VerilogNetBitSelect : public VerilogNetNamed
@@ -591,10 +562,7 @@ public:
   virtual int size(VerilogModule *module);
   virtual VerilogNetNameIterator *nameIterator(VerilogModule *module,
 					       VerilogReader *reader);
-
 private:
-  DISALLOW_COPY_AND_ASSIGN(VerilogNetBitSelect);
-
   int index_;
 };
 
@@ -612,8 +580,6 @@ public:
   int toIndex() const { return to_index_; }
 
 private:
-  DISALLOW_COPY_AND_ASSIGN(VerilogNetPartSelect);
-
   int from_index_;
   int to_index_;
 };
@@ -629,7 +595,6 @@ public:
 					       VerilogReader *reader);
 
 private:
-  DISALLOW_COPY_AND_ASSIGN(VerilogNetConstant);
   void parseConstant(const char *constant,
 		     VerilogReader *reader);
   void parseConstant(const char *constant,
@@ -654,8 +619,6 @@ public:
 					       VerilogReader *reader);
 
 private:
-  DISALLOW_COPY_AND_ASSIGN(VerilogNetConcat);
-
   VerilogNetSeq *nets_;
 };
 
@@ -666,9 +629,6 @@ public:
   explicit VerilogNetPortRef(const char *name);
   virtual bool isNamedPortRef() { return true; }
   virtual bool hasNet() = 0;
-
-private:
-  DISALLOW_COPY_AND_ASSIGN(VerilogNetPortRef);
 };
 
 // Named scalar port reference to scalar net .port(net).
@@ -707,8 +667,6 @@ public:
   virtual bool hasNet() { return net_ != nullptr; }
 
 private:
-  DISALLOW_COPY_AND_ASSIGN(VerilogNetPortRefScalar);
-
   VerilogNet *net_;
 };
 
@@ -721,8 +679,6 @@ public:
   virtual const char *name();
 
 private:
-  DISALLOW_COPY_AND_ASSIGN(VerilogNetPortRefBit);
-
   int index_;
 };
 
@@ -737,8 +693,6 @@ public:
   int toIndex() const { return to_index_; }
 
 private:
-  DISALLOW_COPY_AND_ASSIGN(VerilogNetPortRefPart);
-
   int to_index_;
 };
 

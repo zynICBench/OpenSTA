@@ -18,7 +18,6 @@
 
 #include <algorithm>
 
-#include "DisallowCopyAssign.hh"
 #include "Stats.hh"
 #include "Debug.hh"
 #include "Mutex.hh"
@@ -383,11 +382,8 @@ Sdc::removeLibertyAnnotations()
       LibertyPortPair *pair = from_to_iter.next();
       const LibertyPort *from = pair->first;
       const LibertyPort *to = pair->second;
-      LibertyCellTimingArcSetIterator arc_iter(cell, from, to);
-      while (arc_iter.hasNext()) {
-	TimingArcSet *arc_set = arc_iter.next();
+      for (TimingArcSet *arc_set : cell->timingArcSets(from, to))
 	arc_set->setIsDisabledConstraint(false);
-      }
     }
   }
 
@@ -780,7 +776,8 @@ Sdc::haveClkSlewLimits() const
 }
 
 void
-Sdc::slewLimit(Clock *clk, const RiseFall *rf,
+Sdc::slewLimit(Clock *clk,
+               const RiseFall *rf,
 	       const PathClkOrData clk_data,
 	       const MinMax *min_max,
 	       float &slew,
@@ -795,7 +792,7 @@ Sdc::slewLimit(Port *port,
 	       float &slew,
 	       bool &exists)
 {
-  slew = 0.0;
+  slew = INF;
   MinMaxFloatValues values;
   port_slew_limit_map_.findKey(port, values, exists);
   if (exists)
@@ -817,7 +814,7 @@ Sdc::slewLimit(Cell *cell,
 	       float &slew,
 	       bool &exists)
 {
-  slew = 0.0;
+  slew = INF;
   MinMaxFloatValues values;
   cell_slew_limit_map_.findKey(cell, values, exists);
   if (exists)
@@ -1319,9 +1316,6 @@ protected:
   PinPairSet drvr_loads_;
   const Network *network_;
   Sdc *sdc_;
-
-private:
-  DISALLOW_COPY_AND_ASSIGN(FindClkHpinDisables);
 };
 
 FindClkHpinDisables::FindClkHpinDisables(Clock *clk,
@@ -2724,7 +2718,7 @@ Sdc::findInputDelay(const Pin *pin,
 
 void
 Sdc::removeInputDelay(Pin *pin,
-		      RiseFallBoth *rf,
+		      const RiseFallBoth *rf,
 		      Clock *clk,
 		      RiseFall *clk_rf,
 		      MinMaxAll *min_max)
@@ -3193,9 +3187,6 @@ protected:
   float &fanout_;
   bool &has_set_load_;
   const Sdc *sdc_;
-
-private:
-  DISALLOW_COPY_AND_ASSIGN(FindNetCaps);
 };
 
 FindNetCaps::FindNetCaps(const RiseFall *rf,
@@ -3414,11 +3405,8 @@ Sdc::disable(LibertyCell *cell,
   }
   if (from && to) {
     disabled_cell->setDisabledFromTo(from, to);
-    LibertyCellTimingArcSetIterator arc_iter(cell, from, to);
-    while (arc_iter.hasNext()) {
-      TimingArcSet *arc_set = arc_iter.next();
+    for (TimingArcSet *arc_set : cell->timingArcSets(from, to))
       arc_set->setIsDisabledConstraint(true);
-    }
   }
   else if (from) {
     disabled_cell->setDisabledFrom(from);
@@ -3443,11 +3431,8 @@ Sdc::removeDisable(LibertyCell *cell,
   if (disabled_cell) {
     if (from && to) {
       disabled_cell->removeDisabledFromTo(from, to);
-      LibertyCellTimingArcSetIterator arc_iter(cell, from, to);
-      while (arc_iter.hasNext()) {
-	TimingArcSet *arc_set = arc_iter.next();
-	arc_set->setIsDisabledConstraint(false);
-      }
+      for (TimingArcSet *arc_set : cell->timingArcSets(from, to))
+        arc_set->setIsDisabledConstraint(false);
     }
     else if (from) {
       disabled_cell->removeDisabledFrom(from);
@@ -3603,9 +3588,6 @@ protected:
 
   PinPairSet *pairs_;
   Graph *graph_;
-
-private:
-  DISALLOW_COPY_AND_ASSIGN(DisableEdgesThruHierPin);
 };
 
 DisableEdgesThruHierPin::DisableEdgesThruHierPin(PinPairSet *pairs,
@@ -3650,9 +3632,6 @@ protected:
 
   PinPairSet *pairs_;
   Graph *graph_;
-
-private:
-  DISALLOW_COPY_AND_ASSIGN(RemoveDisableEdgesThruHierPin);
 };
 
 RemoveDisableEdgesThruHierPin::RemoveDisableEdgesThruHierPin(PinPairSet *pairs,
@@ -3896,10 +3875,8 @@ Sdc::exceptionToInvalid(const Pin *pin)
   LibertyPort *port = network_->libertyPort(pin);
   if (port) {
     LibertyCell *cell = port->libertyCell();
-    LibertyCellTimingArcSetIterator set_iter(cell, nullptr, port);
-    while (set_iter.hasNext()) {
-      TimingArcSet *set = set_iter.next();
-      TimingRole *role = set->role();
+    for (TimingArcSet *arc_set : cell->timingArcSets(nullptr, port)) {
+      TimingRole *role = arc_set->role();
       if (role->genericRole() == TimingRole::regClkToQ())
 	return true;
     }
@@ -4062,9 +4039,7 @@ Sdc::hasLibertyChecks(const Pin *pin)
   if (cell) {
     LibertyPort *port = network_->libertyPort(pin);
     if (port) {
-      LibertyCellTimingArcSetIterator timing_iter(cell, nullptr, port);
-      while (timing_iter.hasNext()) {
-	TimingArcSet *arc_set = timing_iter.next();
+      for (TimingArcSet *arc_set : cell->timingArcSets(nullptr, port)) {
 	if (arc_set->role()->isTimingCheck())
 	  return true;
       }
@@ -5264,9 +5239,6 @@ public:
 
 private:
   ExceptionPathSet &expansions_;
-
-private:
-  DISALLOW_COPY_AND_ASSIGN(ExpandException);
 };
 
 ExpandException::ExpandException(ExceptionPath *exception,
@@ -5371,11 +5343,11 @@ Sdc::exceptionFromStates(const Pin *pin,
   if (pin) {
     if (srch_from && first_from_pin_exceptions_)
       srch_from &= exceptionFromStates(first_from_pin_exceptions_->findKey(pin),
-				       nullptr, rf, min_max, include_filter,
+				       pin, rf, min_max, include_filter,
 				       states);
     if (srch_from && first_thru_pin_exceptions_)
       srch_from &= exceptionFromStates(first_thru_pin_exceptions_->findKey(pin),
-				       nullptr, rf, min_max, include_filter,
+				       pin, rf, min_max, include_filter,
 				       states);
 
     if (srch_from
@@ -5495,13 +5467,13 @@ Sdc::filterRegQStates(const Pin *to_pin,
   }
 }
 
-void
+ExceptionStateSet *
 Sdc::exceptionThruStates(const Pin *from_pin,
 			 const Pin *to_pin,
 			 const RiseFall *to_rf,
-			 const MinMax *min_max,
-			 ExceptionStateSet *&states) const
+			 const MinMax *min_max) const
 {
+  ExceptionStateSet *states = nullptr;
   if (first_thru_pin_exceptions_)
     exceptionThruStates(first_thru_pin_exceptions_->findKey(to_pin),
 			to_rf, min_max, states);
@@ -5517,6 +5489,7 @@ Sdc::exceptionThruStates(const Pin *from_pin,
     exceptionThruStates(first_thru_inst_exceptions_->findKey(to_inst),
 			to_rf, min_max, states);
   }
+  return states;
 }
 
 void
@@ -5648,19 +5621,21 @@ Sdc::isCompleteTo(ExceptionState *state,
 			  min_max, match_min_max_exactly, require_to_pin);
 }
 
-////////////////////////////////////////////////////////////////
-
-Wireload *
-Sdc::wireloadDefaulted(const MinMax *min_max)
+bool
+Sdc::isCompleteTo(ExceptionState *state,
+		  const Pin *pin,
+		  const RiseFall *rf,
+		  const MinMax *min_max) const
 {
-  Wireload *wireload1 = wireload(min_max);
-  if (wireload1 == nullptr) {
-    LibertyLibrary *default_lib = network_->defaultLibertyLibrary();
-    if (default_lib)
-      wireload1 = default_lib->defaultWireload();
-  }
-  return wireload1;
+  ExceptionPath *exception = state->exception();
+  ExceptionTo *to = exception->to();
+  return state->nextThru() == nullptr
+    && to
+    && exception->matches(min_max, true)
+    && to->matches(pin, rf, network_);
 }
+
+////////////////////////////////////////////////////////////////
 
 Wireload *
 Sdc::wireload(const MinMax *min_max)

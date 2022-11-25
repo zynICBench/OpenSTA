@@ -16,6 +16,8 @@
 
 #pragma once
 
+#include <memory>
+
 #include "Vector.hh"
 #include "Map.hh"
 #include "Set.hh"
@@ -45,6 +47,7 @@ class Wireload;
 class WireloadSelection;
 class TimingArcSet;
 class TimingArc;
+class TimingArcAttrs;
 class InternalPower;
 class LeakagePower;
 class Sequential;
@@ -54,7 +57,6 @@ class TimingRole;
 class Transition;
 class RiseFall;
 class RiseFallBoth;
-class LibertyCellSequentialIterator;
 
 typedef Vector<LibertyLibrary*> LibertyLibrarySeq;
 typedef Vector<LibertyCell*> LibertyCellSeq;
@@ -66,6 +68,8 @@ typedef std::pair<const LibertyPort*,const LibertyPort*> LibertyPortPair;
 typedef Set<LibertyCell*> LibertyCellSet;
 typedef Vector<float> FloatSeq;
 typedef Vector<FloatSeq*> FloatTable;
+typedef std::shared_ptr<TimingArcAttrs> TimingArcAttrsPtr;
+typedef std::shared_ptr<TableAxis> TableAxisPtr;
 
 enum class ScaleFactorType : unsigned {
   pin_cap,

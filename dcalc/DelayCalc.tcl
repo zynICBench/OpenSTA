@@ -84,16 +84,17 @@ proc report_edge_dcalc { edge corner min_max digits } {
 	    || ($min_max=="min" && $role=="setup"))} {
       report_line "Library: [get_name $library]"
       report_line "Cell: [get_name $cell]"
-      report_line "Arc sense: [$edge sense]"
+      set sense [$edge sense]
+      if { $sense != "unknown" } {
+        report_line "Arc sense: $sense"
+      }
       report_line "Arc type: $role"
 
-      set arc_iter [$edge timing_arc_iterator]
-      while {[$arc_iter has_next]} {
-	set arc [$arc_iter next]
+      foreach arc [$edge timing_arcs] {
 	set from [get_name [$from_pin port]]
-	set from_rf [$arc from_trans]
+	set from_rf [$arc from_edge]
 	set to [get_name [$to_pin port]]
-	set to_rf [$arc to_trans]
+	set to_rf [$arc to_edge]
 	report_line "$from $from_rf -> $to $to_rf"
         report_line [report_delay_calc_cmd $edge $arc $corner $min_max $digits]
 	if { [$edge delay_annotated $arc $corner $min_max] } {
@@ -103,7 +104,6 @@ proc report_edge_dcalc { edge corner min_max digits } {
 	report_line "............................................."
 	report_line ""
       }
-      $arc_iter finish
     }
   }
 }
