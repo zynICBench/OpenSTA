@@ -305,6 +305,8 @@ protected:
   int net_constant_count_;
   int assign_count_;
   int concat_count_;
+public:
+  NameResolve::ModuleList* nameResolver;
 };
 
 class VerilogStmt

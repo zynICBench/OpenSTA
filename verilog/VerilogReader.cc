@@ -145,7 +145,8 @@ VerilogReader::VerilogReader(NetworkReader *network) :
   library_(nullptr),
   black_box_index_(0),
   zero_net_name_("zero_"),
-  one_net_name_("one_")
+  one_net_name_("one_"),
+  nameResolver(NULL)
 {
   network->setLinkFunc(linkVerilogNetwork);
   VerilogConstant10 constant10_max = 0;
@@ -1714,19 +1715,15 @@ VerilogReader::linkNetwork(const char *top_cell_name,
     Cell *top_cell = network_->findCell(library_, top_cell_name);
     VerilogModule *module = this->module(top_cell);
     if (module) {
-      ModuleList modulelist(network_, this);
-      std::cout << "top module name: " << module->name() << std::endl;
-      modulelist.createModule(module->name(), module);
-            // modulelist.print();
-      // namemap(module);
-      // std::cout << "--------------------------------" << std::endl;
-
+      nameResolver = new ModuleList(network_, this);
+      nameResolver->createModule(module->name(), module);
+      // modulelist.print();
       // modulelist.printRes(module, "u_cm3_dap_ahb_ap/dap_ahb_habort_o");
       // modulelist.printRes(module, "u_cm3_sync_dbg_en/d_async_i");
       // modulelist.printRes(module, "u_cm3_nvic/nvic_dbg_restarted_o");
       // modulelist.printRes(module, "u_cm3_nvic/nvic_dbg_trans_o");
       // modulelist.printRes(module, "u_cm3_nvic/nvic_dbg_reg_wr_o");
-      modulelist.printRes(module, "u_cm3_nvic/nvic_dbg_reg_addr_o");
+      // modulelist.printRes(module, "u_cm3_nvic/nvic_dbg_reg_addr_o");
       // modulelist.printRes(module, "u_cm3_nvic/nvic_dbg_snapstall_o");
       // modulelist.printRes(module, "u_cm3_nvic/nvic_trc_en_o");
       // modulelist.printRes(module, "u_cm3_mpu/hreset_n");
