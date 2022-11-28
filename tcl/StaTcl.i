@@ -79,6 +79,7 @@
 #include "search/Levelize.hh"
 #include "search/ReportPath.hh"
 #include "search/Power.hh"
+#include "verilog/VerilogReaderPvt.hh"
 
 namespace sta {
 
@@ -2411,6 +2412,26 @@ find_pins_hier_matching(const char *pattern,
   PatternMatch matcher(pattern, regexp, nocase, Sta::sta()->tclInterp());
   TmpPinSeq *pins = new TmpPinSeq;
   network->findPinsHierMatching(current_instance, &matcher, pins);
+  return pins;
+}
+
+TmpPinSeq *
+find_pins_matching_icb(const char *pattern,
+			bool regexp,
+			bool nocase)
+{
+  Sta *sta = Sta::sta();
+  Network *network = cmdLinkedNetwork();
+
+  std::vector<std::string> results;
+  sta->icbNamematch(pattern, results);
+
+  TmpPinSeq *pins = new TmpPinSeq;
+  for (size_t i = 0; i < results.size(); ++i) {
+    Instance *current_instance = sta->currentInstance();
+    PatternMatch matcher(results[i].c_str(), regexp, nocase, Sta::sta()->tclInterp());  
+    network->findPinsHierMatching(current_instance, &matcher, pins);
+  }
   return pins;
 }
 

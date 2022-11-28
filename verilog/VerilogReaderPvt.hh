@@ -70,9 +70,9 @@ typedef unsigned long long VerilogConstant10;
 
 extern VerilogReader *verilog_reader;
 
-namespace NameResolve {
-class ModuleList;
-}
+// namespace NameResolve {
+// class ModuleList;
+// }
 class VerilogReader
 {
 public:
@@ -305,8 +305,6 @@ protected:
   int net_constant_count_;
   int assign_count_;
   int concat_count_;
-public:
-  NameResolve::ModuleList* nameResolver;
 };
 
 class VerilogStmt

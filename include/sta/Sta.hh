@@ -1395,6 +1395,9 @@ protected:
 
 private:
   DISALLOW_COPY_AND_ASSIGN(Sta);
+public:
+  typedef std::vector<std::string> StrVec;
+  void icbNamematch(const char *pattern, StrVec& results);
 };
 
 } // namespace

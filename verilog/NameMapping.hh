@@ -116,8 +116,8 @@ public:
   }
   
   void
-  printRes(VerilogModule* module, std::string const &path) const {
-      Module::StringVec res = findSource(module->name(), path);
+  printRes(std::string const &path) const {
+      Module::StringVec res = findSource(path);
       while(!res.empty()) {
         std::string tmp = res.back();
         res.pop_back(); 
@@ -125,7 +125,7 @@ public:
       }
   }
   Module::StringVec
-  findSource(std::string rootModule, std::string const &path) const {
+  findSource(std::string const &path) const {
     Module* root = getModule(rootModule);
     return root->findHierSource(path);
   }
@@ -133,11 +133,12 @@ public:
     return modules.find(modname)->second;
   }
 
-  ModuleList(NetworkReader* nl, VerilogReader* rd) : network(nl), reader(rd) {}
+  ModuleList(std::string const & rmName, NetworkReader* nl, VerilogReader* rd) : rootModule(rmName), network(nl), reader(rd) {}
 private:
   typedef std::unordered_map<std::string, Module *> Modules;
   Modules        modules;
 public:
+  std::string    rootModule;
   NetworkReader* network;
   VerilogReader* reader;
 };

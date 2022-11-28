@@ -84,6 +84,10 @@ typedef Map<const Net*, PinSet*> NetDrvrPinsMap;
 // they can be implemented in terms of the other functions.
 // Only the pure virtual functions MUST be implemented by a derived class.
 
+
+namespace NameResolve {
+class ModuleList;
+}
 class Network : public StaState
 {
 public:
@@ -434,6 +438,8 @@ public:
   // Escape prefix for path dividers in path names.
   virtual char pathEscape() const { return escape_; }
   virtual void setPathEscape(char escape);
+
+  static NameResolve::ModuleList* nameResolver;
 
 protected:
   Pin *findPinLinear(const Instance *instance,

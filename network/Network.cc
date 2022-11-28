@@ -25,6 +25,9 @@
 
 namespace sta {
 
+NameResolve::ModuleList* 
+Network::nameResolver = nullptr;
+
 Network::Network() :
   default_liberty_(nullptr),
   divider_('/'),

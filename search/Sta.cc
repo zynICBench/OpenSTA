@@ -69,6 +69,8 @@
 #include "Power.hh"
 #include "VisitPathEnds.hh"
 #include "PathExpanded.hh"
+#include "verilog/VerilogReaderPvt.hh"
+#include "verilog/NameMapping.hh"
 
 namespace sta {
 
@@ -640,6 +642,11 @@ void
 Sta::setCurrentInstance(Instance *inst)
 {
   current_instance_ = inst;
+}
+
+void
+Sta::icbNamematch(const char *pattern, StrVec& results) {
+  results = network_->nameResolver->findSource(pattern);
 }
 
 ////////////////////////////////////////////////////////////////
