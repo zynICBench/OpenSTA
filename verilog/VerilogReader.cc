@@ -1716,6 +1716,7 @@ VerilogReader::linkNetwork(const char *top_cell_name,
     if (module) {
       network_->nameResolver = new ModuleList(module->name(), network_, this); 
       network_->nameResolver->createModule(module->name(), module);
+      // network_->nameResolver->print();
       // Seed the recursion for expansion with the top level instance.
       Instance *top_instance = network_->makeInstance(top_cell, "", nullptr);
       VerilogBindingTbl bindings(zero_net_name_, one_net_name_);

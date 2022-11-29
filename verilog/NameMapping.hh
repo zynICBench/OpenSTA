@@ -52,6 +52,7 @@ public:
 
   void processModuleInst(VerilogModuleInst* s);
   void processLibertyInst(VerilogLibertyInst* s);
+  void processLibertyInstAsModule(VerilogModuleInst* s);
   void processDeclaration(VerilogDcl* dcl);
   void processAssign(VerilogAssign* s);
   void processStmt(VerilogStmt* s);

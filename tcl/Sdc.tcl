@@ -934,14 +934,16 @@ proc get_pins { args } {
 	set matches [find_pins_matching $pattern $regexp $nocase]
       }
       set pins [concat $pins $matches]
-      if { $matches == {} && !$quiet } {
+      if { $matches == {} } {
     # run icb namematch
         global disable_icbsdc_path_finding
         if {[info exists disable_icbsdc_path_finding] == 0 ||
             $disable_icbsdc_path_finding != 1 } {
-  set matches [find_pins_matching_icb $pattern $regexp $nocase]
-  set pins [concat $pins $matches]
-	sta_warn 335 "pin '$pattern' not found."
+          set matches [find_pins_matching_icb $pattern $regexp $nocase]
+          if { $matches == {} && !$quiet } {
+	          sta_warn 335 "pin '$pattern' not found."
+          }
+          set pins [concat $pins $matches]
         }
       }
     }
