@@ -339,11 +339,17 @@ Module::instModule(std::string const & instname) const {
 }
 
 Module::StringVec
-Module::findHierSource(std::string const & key) {
-  size_t pos = key.find('/');
-  if (pos == -1) return findSource(key);
-  std::string instname = key.substr(0, pos);
-  std::string hiername = key.substr(pos + 1);
+Module::findHierSource(std::string key) {
+  std::string instname;
+  std::string hiername;
+  while (1) {
+    size_t pos = key.find('/');
+    if (pos == -1) return findSource(key);
+    instname = key.substr(0, pos);
+    hiername = key.substr(pos + 1);
+    if (!symbols.count(instname)) key[pos] = '.';
+    else break;
+  }
   Module* instmod = instModule(instname);
   if (!instmod) return StringVec(1, key);
   StringVec subress = instmod->findHierSource(hiername);

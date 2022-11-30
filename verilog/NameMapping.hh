@@ -67,7 +67,7 @@ public:
   }
   // search methods
   typedef std::vector<std::string> StringVec;
-  StringVec findHierSource(std::string const & key);
+  StringVec findHierSource(std::string key);
   StringVec findSource(std::string const & key);
   std::string findOneSource(std::string const & key);
 
