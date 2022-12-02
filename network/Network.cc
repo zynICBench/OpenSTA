@@ -895,13 +895,18 @@ Network::findPinsHierMatching(const Instance *instance,
 			      // Return value.
 			      PinSeq *pins) const
 {
-  InstanceChildIterator *child_iter = childIterator(instance);
-  while (child_iter->hasNext()) {
-    Instance *child = child_iter->next();
-    findInstPinsHierMatching(child, pattern, pins);
-    findPinsHierMatching(child, pattern, pins);
+  if (pattern->hasWildcards()) {
+    InstanceChildIterator *child_iter = childIterator(instance);
+    while (child_iter->hasNext()) {
+      Instance *child = child_iter->next();
+      findInstPinsHierMatching(child, pattern, pins);
+      findPinsHierMatching(child, pattern, pins);
+    }
+    delete child_iter;
+  } else {
+    Pin* res = findPinRelative(instance, pattern->pattern());
+    if (res) pins->push_back(res);
   }
-  delete child_iter;
 }
 
 void
