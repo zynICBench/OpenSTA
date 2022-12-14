@@ -409,5 +409,25 @@ ModuleList::createModule(std::string const &name, VerilogModule* m) {
   return modules.insert({name, mod}).first->second;
 }
 
+void 
+Module::print() const {
+  for (auto &s : symbols) {
+    std::cout << "inst name: " << s.first << std::endl;
+    // std::cout << "inst name cmp:  " << s.second.name << std::endl;
+    std::cout << "cmp name: " << s.second.name << std::endl;
+    std::cout << "module: " << s.second.moduleName << std::endl; 
+    std::cout << "src: " << s.second.src << std::endl;
+    std::cout << "-----------------------------------------------------"  << std::endl;     
+  }
+}
+void 
+ModuleList::print() {
+  for (auto &x : modules) {
+    std::cout << x.first << std::endl;
+    x.second->print();
+  }
+}
+  
+
 } // end namespace NameResolve
 } // end namespace sta

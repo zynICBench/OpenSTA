@@ -89,17 +89,7 @@ public:
   typedef typename Symbols::const_iterator const_iterator;
   typedef typename Symbols::key_type key_type;
   typedef typename Symbols::value_type value_type;
-  void print() const {
-    for (auto &s : symbols) {
-      std::cout << "inst name: " << s.first << std::endl;
-      // std::cout << "inst name cmp:  " << s.second.name << std::endl;
-      std::cout << "cmp name: " << s.second.name << std::endl;
-      std::cout << "module: " << s.second.moduleName << std::endl; 
-      std::cout << "src: " << s.second.src << std::endl;
-      std::cout << "-----------------------------------------------------"  << std::endl;
-      
-    }
-  }
+  void print() const ;
 };
 
 class ModuleList {
@@ -109,12 +99,7 @@ public:
     for (auto &x : modules)
       delete x.second;
   }
-  void print() {
-    for (auto &x : modules) {
-      std::cout << x.first << std::endl;
-      x.second->print();
-    }
-  }
+  void print();
   
   void
   printRes(std::string const &path) const {
