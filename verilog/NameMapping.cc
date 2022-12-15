@@ -194,9 +194,30 @@ Module::processLibertyInstAsModule(VerilogModuleInst* s) {
       assert(0 && "pin is not handled");
     }
   }
+  if (libertycell->isBuffer()) {
+ 	connectBufferPins(libertycell, instname);
+  }
 }
 
 #undef ADDNETANDCONN
+
+void
+Module::connectBufferPins(LibertyCell* cell, std::string const & instname) {
+  std::string i, o;
+  auto iter = cell->portIterator();
+  while (iter->hasNext()) {
+	auto item = iter->next();
+	const char *port = item->name();
+	assert(port);
+	std::string instport = std::string(instname) + "/" + port;
+	if (item->direction()->isInput()) i = instport;
+	else                              o = instport;
+  }
+  assert(i.size());
+  assert(o.size());
+  addConnection(i, o);
+}
+
 void
 Module::processLibertyInst(VerilogLibertyInst* s) {
   const char  *instname = s->instanceName();
@@ -220,6 +241,9 @@ Module::processLibertyInst(VerilogLibertyInst* s) {
       if (item->direction()->isInput()) addConnection(pin, instport);
       else                              addConnection(instport, pin);
     }
+  }
+  if (cell->isBuffer()) {
+	  connectBufferPins(cell, instname);
   }
 }
 
@@ -312,6 +336,28 @@ Module::addInstSymbol(std::string const &instname, std::string const &modname) {
   sym.name       = instname;
   sym.moduleName = modname;
 }
+
+std::string
+Module::nameRegulation(std::string const & n) const {
+  std::string res = n;
+  // replace all \\[ \\]
+  size_t w = 0;
+  size_t r = 0;
+  for (; r < res.size();) {
+	 if (res[r] == '\\' && r + 1 < res.size()) {
+		 ++r;
+		 continue;
+	 }
+    if (r != w)
+      res[w] = res[r];
+    ++r;
+    ++w;
+  }
+  if (r != w)
+    res = res.substr(0, w);
+  return res;
+}
+
 void
 Module::addNetSymbol(std::string const &netname, bool isPort) {
   Symbol &sym = addSymbol(netname);

@@ -62,9 +62,12 @@ public:
   void addNetSymbol(std::string const &netname, bool isPort);
   void addBusSymbol(std::string const &netname, bool isPort, int left, int right);
   void addConnection(std::string const &from, std::string const &to) {
-    assert(symbols.count(to));
-    symbols.find(to)->second.src = from;
+	 std::string f = nameRegulation(from);
+	 std::string t = nameRegulation(to);
+    assert(symbols.count(t));
+    symbols.find(t)->second.src = f;
   }
+  void connectBufferPins(LibertyCell* cell, std::string const & instname);
   // search methods
   typedef std::vector<std::string> StringVec;
   StringVec findHierSource(std::string key);
@@ -76,9 +79,11 @@ public:
     processModule();
   }
 private:
+  std::string nameRegulation(std::string const & name) const;
   Module* instModule(std::string const & instname) const;
   Symbol &addSymbol(std::string const &name) {
-    return symbols.insert({name, Symbol()}).first->second;
+	 std::string n = nameRegulation(name);
+    return symbols.insert({n, Symbol()}).first->second;
   }
   typedef std::unordered_map<std::string, Symbol> Symbols;
   Symbols        symbols;
@@ -89,7 +94,7 @@ public:
   typedef typename Symbols::const_iterator const_iterator;
   typedef typename Symbols::key_type key_type;
   typedef typename Symbols::value_type value_type;
-  void print() const ;
+  void print() const;
 };
 
 class ModuleList {
@@ -113,7 +118,9 @@ public:
   Module::StringVec
   findSource(std::string const &path) const {
     Module* root = getModule(rootModule);
-    return root->findHierSource(path);
+    Module::StringVec res = root->findHierSource(path);
+    if (!res.size()) res.push_back(path);
+    return res;
   }
   Module *getModule(std::string modname) const {
     return modules.find(modname)->second;
