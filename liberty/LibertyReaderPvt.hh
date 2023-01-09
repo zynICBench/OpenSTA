@@ -657,6 +657,32 @@ private:
   DISALLOW_COPY_AND_ASSIGN(LibertyStateTable);
 };
 
+class LibertyStateTable
+{
+public:
+  LibertyStateTable(int line) : line_(line) {}
+  ~LibertyStateTable() {
+    for (auto & name : names) delete [] name;
+    for (auto * value : values) delete [] value;
+  }
+
+  void addInput(const char* name) { names.push_back(name); }
+  void addOutput(const char* name) { names.push_back(name); }
+
+  void addValues(const char* value) { values.push_back(value); }
+  const char* name() const { return names.back(); }
+  int line() const { return line_; }
+  const char* attr_name() { return "state_table"; }
+
+  FuncExpr *parseFunc(LibertyCell* cell, const char* error_msg, Report* report);
+protected:
+  std::vector<const char*> names;
+  std::vector<const char*> values;
+  int line_;
+private:
+  DISALLOW_COPY_AND_ASSIGN(LibertyStateTable);
+};
+
 // Port attributes that refer to other ports cannot be parsed
 // until all of the ports are defined.  This class saves them
 // so they can be parsed at the end of the cell.

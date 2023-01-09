@@ -2091,7 +2091,7 @@ LibertyStateTable::parseFunc(LibertyCell *cell, const char* error_msg, Report *r
 	 size_t l = strlen(value);
     for (size_t i = 0, s = 0; i < l; ++i) {
     	char c = value[i];
-    	FuncExpr* se = s < params.size() ? params[s] : nullptr;
+    	FuncExpr* se = s < params.size() ? params[s]->copy() : nullptr;
     	switch(c) {
     	case '-': ++s; break;
     	case ':': break;
@@ -2111,7 +2111,7 @@ LibertyStateTable::parseFunc(LibertyCell *cell, const char* error_msg, Report *r
     		}
     	} break;
     	case 'N': {
-    		se = params[params.size() - 1];
+    		se = params[params.size() - 1]->copy();
     	   e = e ? FuncExpr::makeAnd(e, se) : se;
     	} break;
     	default:
@@ -2120,6 +2120,8 @@ LibertyStateTable::parseFunc(LibertyCell *cell, const char* error_msg, Report *r
      }
     res = res ? FuncExpr::makeOr(res, e) : e;
   }
+  for (auto param : params)
+	 delete param;
   return res;
 }
 
