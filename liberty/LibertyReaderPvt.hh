@@ -36,6 +36,7 @@ namespace sta {
 class LibertyBuilder;
 class LibertyReader;
 class LibertyFunc;
+class LibertyStateTable;
 class PortGroup;
 class SequentialGroup;
 class RelatedPortGroup;
@@ -50,6 +51,7 @@ typedef void (LibertyReader::*LibraryAttrVisitor)(LibertyAttr *attr);
 typedef void (LibertyReader::*LibraryGroupVisitor)(LibertyGroup *group);
 typedef Map<const char*,LibraryAttrVisitor,CharPtrLess> LibraryAttrMap;
 typedef Map<const char*,LibraryGroupVisitor,CharPtrLess> LibraryGroupMap;
+typedef Map<const char*,LibertyStateTable*,CharPtrLess> LibertyStateTableMap;
 typedef Vector<PortGroup*> PortGroupSeq;
 typedef Vector<SequentialGroup*> SequentialGroupSeq;
 typedef Vector<LibertyFunc*> LibertyFuncSeq;
@@ -196,6 +198,9 @@ public:
   virtual void endPin(LibertyGroup *group);
   virtual void beginBus(LibertyGroup *group);
   virtual void endBus(LibertyGroup *group);
+  virtual void beginStateTable(LibertyGroup *group);
+  virtual void endStateTable(LibertyGroup *group);
+  virtual void visitTable(LibertyAttr *attr);
   virtual void beginBundle(LibertyGroup *group);
   virtual void endBundle(LibertyGroup *group);
   virtual void beginBusOrBundle(LibertyGroup *group);
@@ -204,7 +209,9 @@ public:
   virtual void setPortCapDefault(LibertyPort *port);
   virtual void visitMembers(LibertyAttr *attr);
   virtual void visitDirection(LibertyAttr *attr);
+  virtual void visitInternalNode(LibertyAttr *attr);
   virtual void visitFunction(LibertyAttr *attr);
+  virtual void visitStateFunction(LibertyAttr *attr);
   virtual void visitThreeState(LibertyAttr *attr);
   virtual void visitBusType(LibertyAttr *attr);
   virtual void visitCapacitance(LibertyAttr *attr);
@@ -566,6 +573,8 @@ protected:
   InternalPowerGroup *internal_power_;
   LeakagePowerGroup *leakage_power_;
   LeakagePowerGroupSeq leakage_powers_;
+  LibertyStateTable* state_table_;
+  LibertyStateTableMap cell_state_tables_;
   RiseFall *rf_;
   OcvDerate *ocv_derate_;
   RiseFallBoth *rf_type_;
@@ -620,6 +629,32 @@ protected:
   bool invert_;
   const char *attr_name_;
   int line_;
+};
+
+class LibertyStateTable
+{
+public:
+  LibertyStateTable(int line) : line_(line) {}
+  ~LibertyStateTable() {
+    for (auto & name : names) delete [] name;
+    for (auto * value : values) delete [] value;
+  }
+
+  void addInput(const char* name) { names.push_back(name); }
+  void addOutput(const char* name) { names.push_back(name); }
+
+  void addValues(const char* value) { values.push_back(value); }
+  const char* name() const { return names.back(); }
+  int line() const { return line_; }
+  const char* attr_name() { return "state_table"; }
+
+  FuncExpr *parseFunc(LibertyCell* cell, const char* error_msg, Report* report);
+protected:
+  std::vector<const char*> names;
+  std::vector<const char*> values;
+  int line_;
+private:
+  DISALLOW_COPY_AND_ASSIGN(LibertyStateTable);
 };
 
 // Port attributes that refer to other ports cannot be parsed
