@@ -17,6 +17,7 @@
 #include "LibertyReader.hh"
 
 #include <ctype.h>
+#include <cassert>
 #include <stdlib.h>
 
 #include "Report.hh"
@@ -132,6 +133,7 @@ LibertyReader::readLibertyFile(const char *filename,
   pg_port_ = nullptr;
   have_resistance_unit_ = false;
   default_operating_condition_ = nullptr;
+  state_table_ = nullptr;
 
   for (auto rf_index : RiseFall::rangeIndex()) {
     have_input_threshold_[rf_index] = false;
@@ -298,13 +300,19 @@ LibertyReader::defineVisitors()
 
   defineGroupVisitor("pin", &LibertyReader::beginPin,&LibertyReader::endPin);
   defineGroupVisitor("bus", &LibertyReader::beginBus,&LibertyReader::endBus);
+  defineGroupVisitor("statetable", &LibertyReader::beginStateTable,&LibertyReader::endStateTable);
+
+  defineAttrVisitor("table", &LibertyReader::visitTable);
+
   defineGroupVisitor("bundle", &LibertyReader::beginBundle,
 		     &LibertyReader::endBundle);
+  defineAttrVisitor("internal_node", &LibertyReader::visitInternalNode);
   defineAttrVisitor("direction", &LibertyReader::visitDirection);
   defineAttrVisitor("clock", &LibertyReader::visitClock);
   defineAttrVisitor("bus_type", &LibertyReader::visitBusType);
   defineAttrVisitor("members", &LibertyReader::visitMembers);
   defineAttrVisitor("function", &LibertyReader::visitFunction);
+  defineAttrVisitor("state_function", &LibertyReader::visitStateFunction);
   defineAttrVisitor("three_state", &LibertyReader::visitThreeState);
   defineAttrVisitor("capacitance", &LibertyReader::visitCapacitance);
   defineAttrVisitor("rise_capacitance", &LibertyReader::visitRiseCap);
@@ -2049,6 +2057,51 @@ LibertyReader::makeLibertyFunc(const char *expr,
   cell_funcs_.push_back(func);
 }
 
+FuncExpr *
+LibertyStateTable::parseFunc(LibertyCell *cell, const char* error_msg, Report *report)
+{
+  std::vector<FuncExpr*> params;
+  for (auto name : names) {
+	  params.push_back(parseFuncExpr(name, cell, error_msg, report));
+  }
+  FuncExpr *res = nullptr;
+  for (auto value : values) {
+	 FuncExpr* e = nullptr;
+	 size_t l = strlen(value);
+    for (size_t i = 0, s = 0; i < l; ++i) {
+    	char c = value[i];
+    	FuncExpr* se = s < params.size() ? params[s] : nullptr;
+    	switch(c) {
+    	case '-': ++s; break;
+    	case ':': break;
+    	case 'L': {
+    		if (se) {
+    		  FuncExpr* nse = FuncExpr::makeNot(se);
+    		  e = e ? FuncExpr::makeAnd(e, nse) : nse;
+    		  ++s;
+    		} else {
+    		  e = e ? FuncExpr::makeNot(e) : nullptr;
+    		}
+    	} break;
+    	case 'H': {
+    		if (se) {
+    		  e = e ? FuncExpr::makeAnd(e, se) : se;
+    		  ++s;
+    		}
+    	} break;
+    	case 'N': {
+    		se = params[params.size() - 1];
+    	   e = e ? FuncExpr::makeAnd(e, se) : se;
+    	} break;
+    	default:
+    		assert(0 && "unknown token");
+    	};
+     }
+    res = res ? FuncExpr::makeOr(res, e) : e;
+  }
+  return res;
+}
+
 void
 LibertyReader::parseCellFuncs()
 {
@@ -2074,6 +2127,21 @@ LibertyReader::parseCellFuncs()
     delete func;
   }
   cell_funcs_.clear();
+  // state table resolved here
+  LibertyStateTableMap::Iterator statetable_iter(cell_state_tables_);
+  while (statetable_iter.hasNext()) {
+    LibertyStateTable *table = statetable_iter.next();
+    const char *error_msg = stringPrintTmp("%s, line %d %s",
+    	 filename_,
+    	 table->line(),
+    	 table->attr_name());
+    FuncExpr *expr = table->parseFunc(cell_, error_msg, report_);
+    const char* pin_name = table->name();
+    LibertyPort* port = cell_->findLibertyPort(pin_name);
+    port->functionRef() = expr;
+    delete table;
+  }
+  cell_state_tables_.clear();
 }
 
 void
@@ -2704,6 +2772,69 @@ LibertyReader::endBusOrBundle()
   port_group_ = nullptr;
 }
 
+void
+LibertyReader::visitTable(LibertyAttr *attr)
+{
+  if (cell_) {
+    std::string contents = getAttrString(attr);
+    std::string values;
+    for (size_t i = 0; i < contents.size(); ++i) {
+      switch (contents[i]) {
+      case ',': state_table_->addValues(stringCopy(values.c_str())); 
+	        values.clear();
+		continue;
+      case ':':
+      case 'L':
+      case 'H':
+      case '-':
+      case 'N': values += contents[i];
+      }
+    }
+    state_table_->addValues(stringCopy(values.c_str()));
+  }
+}
+
+void
+LibertyReader::beginStateTable(LibertyGroup *group)
+{
+  if (cell_) {
+    state_table_ = new LibertyStateTable(group->line());
+    LibertyAttrValueIterator param_iter(group->params());
+    bool is_output = false;
+    while (param_iter.hasNext()) {
+      LibertyAttrValue *param = param_iter.next();
+      if (param->isString()) {
+	std::string name = param->stringValue();
+	std::vector<std::string> names;
+	size_t pos = 0;
+	for (size_t i = 0; i < name.size(); ++i) {
+	  if (name[i] == ' ') {
+	    std::string n = name.substr(pos, i - pos);
+	    if (!n.empty()) names.push_back(n);	
+	    pos = i + 1;
+	  }
+	}
+	std::string n = name.substr(pos);
+	if (!n.empty()) names.push_back(n);
+	for (auto name : names) {
+          if (is_output) state_table_->addInput(stringCopy(name.c_str()));
+   	  else           state_table_->addOutput(stringCopy(name.c_str()));
+	}
+        is_output = true;
+      }
+    }
+  }
+}
+
+void
+LibertyReader::endStateTable(LibertyGroup *group)
+{
+  if (cell_) {
+    cell_state_tables_[state_table_->name()] = state_table_;
+    state_table_ = nullptr;
+  }
+}
+
 // Bus port are not made until the bus_type is specified.
 void
 LibertyReader::visitBusType(LibertyAttr *attr)
@@ -2810,6 +2941,20 @@ LibertyReader::findPort(LibertyCell *cell,
 }
 
 void
+LibertyReader::visitInternalNode(LibertyAttr *attr)
+{
+  if (ports_) {
+    const char* name = getAttrString(attr);
+    LibertyPortSeq::Iterator port_iter(ports_);
+	 while (port_iter.hasNext()) {
+	   LibertyPort *port = port_iter.next();
+	   if (stringEq(port->name(), name))
+	     port->setDirection(PortDirection::internal());
+	}
+  }
+}
+
+void
 LibertyReader::visitDirection(LibertyAttr *attr)
 {
   if (ports_) {
@@ -2849,6 +2994,21 @@ LibertyReader::visitFunction(LibertyAttr *attr)
       while (port_iter.hasNext()) {
 	LibertyPort *port = port_iter.next();
 	makeLibertyFunc(func, port->functionRef(), false, "function", attr);
+      }
+    }
+  }
+}
+
+void
+LibertyReader::visitStateFunction(LibertyAttr *attr)
+{
+  if (ports_) {
+    const char *func = getAttrString(attr);
+    if (func) {
+      LibertyPortSeq::Iterator port_iter(ports_);
+      while (port_iter.hasNext()) {
+     	  LibertyPort *port = port_iter.next();
+        makeLibertyFunc(func, port->functionRef(), false, "state_function", attr);
       }
     }
   }
