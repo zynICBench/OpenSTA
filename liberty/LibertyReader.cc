@@ -539,6 +539,8 @@ LibertyReader::visitAttr(LibertyAttr *attr)
   LibraryAttrVisitor visitor = attr_visitor_map_.findKey(attr->name());
   if (visitor)
     (this->*visitor)(attr);
+  else
+	 libWarn(1002, attr, "library unsupported feature %s.", attr->name());
 }
 
 void
@@ -547,6 +549,8 @@ LibertyReader::begin(LibertyGroup *group)
   LibraryGroupVisitor visitor = group_begin_map_.findKey(group->type());
   if (visitor)
     (this->*visitor)(group);
+  else
+  	 libWarn(1001, group, "library unsupported feature %s.", group->type());
 }
 
 void
