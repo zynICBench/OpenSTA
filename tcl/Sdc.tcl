@@ -547,10 +547,19 @@ proc get_cells { args } {
 	} else {
 	  set matches [find_instances_matching $pattern $regexp $nocase]
 	}
-	if { $matches == {} && !$quiet} {
-	  sta_warn 322 "instance '$pattern' not found."
-	}
 	set insts [concat $insts $matches]
+        if { $matches == {} } {
+          # run icb namematch
+          global disable_icbsdc_path_finding
+          if {[info exists disable_icbsdc_path_finding] == 0 ||
+              $disable_icbsdc_path_finding != 1 } {
+            set matches [find_instances_matching_icb $pattern $regexp $nocase]
+	    if { $matches == {} && !$quiet} {
+	      sta_warn 322 "instance '$pattern' not found."
+	    }
+	    set insts [concat $insts $matches]
+          }
+        }
       }
     }
   }

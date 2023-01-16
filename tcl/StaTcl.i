@@ -2455,6 +2455,24 @@ network_leaf_instances()
 }
 
 TmpInstanceSeq *
+find_instances_matching_icb(const char *pattern,
+			bool regexp,
+			bool nocase)
+{
+  Sta *sta = Sta::sta();
+  std::vector<std::string> results;
+  sta->icbNamematch(pattern, results);
+  
+  TmpInstanceSeq *insts = new InstanceSeq;
+  for (size_t i = 0; i < results.size(); ++i) {
+    Instance *current_instance = sta->currentInstance();
+    PatternMatch matcher(results[i].c_str(), regexp, nocase, sta->tclInterp());
+    cmdLinkedNetwork()->findInstancesMatching(current_instance, &matcher, insts);
+  }
+  return insts;
+}
+
+TmpInstanceSeq *
 find_instances_matching(const char *pattern,
 			bool regexp,
 			bool nocase)
