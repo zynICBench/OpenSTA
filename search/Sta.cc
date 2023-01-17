@@ -646,7 +646,8 @@ Sta::setCurrentInstance(Instance *inst)
 
 void
 Sta::icbNamematch(const char *pattern, StrVec& results) {
-  results = network_->nameResolver->findSource(pattern);
+  if (network_->nameResolver)
+    results = network_->nameResolver->findSource(pattern);
 }
 
 ////////////////////////////////////////////////////////////////
