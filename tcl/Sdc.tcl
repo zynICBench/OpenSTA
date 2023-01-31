@@ -226,6 +226,7 @@ proc set_units { args } {
   check_unit "current" -current "A" keys
   check_unit "power" -power "W" keys
   check_unit "distance" -distance "m" keys
+  check_unit "power" -power "w" keys
 }
 
 proc check_unit { unit key unit_name key_var } {
@@ -1676,7 +1677,13 @@ proc set_clock_uncertainty { args } {
   
   if { [info exists keys(-to)] } {
     set to_key "-to"
-    set to_rf "rise_fall"
+    if { [info exists flags(-rise)] } {
+      set to_rf "rise"
+    } elseif { [info exists flags(-fall)] } {
+      set to_rf "fall"
+    } else {
+      set to_rf "rise_fall"
+    }
   } elseif { [info exists keys(-rise_to)] } {
     set to_key "-rise_to"
     set to_rf "rise"
@@ -2456,8 +2463,8 @@ define_cmd_args "set_input_transition" \
   {[-rise] [-fall] [-min] [-max] transition ports}
 
 proc set_input_transition { args } {
-  parse_key_args "set_input_transition" args keys {-clock -clock_fall} \
-    flags {-rise -fall -max -min}
+  parse_key_args "set_input_transition" args keys {-clock} \
+    flags {-rise -fall -max -min -clock_fall}
   
   set tr [parse_rise_fall_flags flags]
   set min_max [parse_min_max_all_flags flags]
@@ -2473,7 +2480,7 @@ proc set_input_transition { args } {
   if [info exists keys(-clock)] {
     sta_warn 361 "-clock not supported."
   }
-  if [info exists keys(-clock_fall)] {
+  if [info exists flags(-clock_fall)] {
     sta_warn 362 "-clock_fall not supported."
   }
   

@@ -28,6 +28,7 @@
 #include "EquivCells.hh"
 #include "Liberty.hh"
 #include "liberty/LibertyReader.hh"
+#include "LibertyWriter.hh"
 #include "SdcNetwork.hh"
 #include "MakeConcreteNetwork.hh"
 #include "PortDirection.hh"
@@ -71,6 +72,7 @@
 #include "PathExpanded.hh"
 #include "verilog/VerilogReaderPvt.hh"
 #include "verilog/NameMapping.hh"
+#include "MakeTimingModel.hh"
 
 namespace sta {
 
@@ -108,8 +110,6 @@ public:
   virtual void checkDelayChangedTo(Vertex *vertex);
 
 private:
-  DISALLOW_COPY_AND_ASSIGN(StaDelayCalcObserver);
-
   Search *search_;
 };
 
@@ -150,8 +150,6 @@ public:
   virtual void fanoutEdgesChangeAfter(Vertex *vertex);
 
 private:
-  DISALLOW_COPY_AND_ASSIGN(StaSimObserver);
-
   GraphDelayCalc *graph_delay_calc_;
   Levelize *levelize_;
   Search *search_;
@@ -205,8 +203,6 @@ public:
   virtual void levelChangedBefore(Vertex *vertex);
 
 private:
-  DISALLOW_COPY_AND_ASSIGN(StaLevelizeObserver);
-
   Search *search_;
 };
 
@@ -1670,9 +1666,7 @@ hasDisabledArcs(Edge *edge,
 		Graph *graph)
 {
   TimingArcSet *arc_set = edge->timingArcSet();
-  TimingArcSetArcIterator arc_iter(arc_set);
-  while (arc_iter.hasNext()) {
-    TimingArc *arc = arc_iter.next();
+  for (TimingArc *arc : arc_set->arcs()) {
     if (!searchThru(edge, arc, graph))
       return true;
   }
@@ -2014,10 +2008,10 @@ Sta::checkExceptionFromPins(ExceptionFrom *from,
       const Pin *pin = pin_iter.next();
       if (exceptionFromInvalid(pin)) {
 	if (line)
-	  report_->fileWarn(160, file, line, "'%s' is not a valid startpoint.",
+	  report_->fileWarn(267, file, line, "'%s' is not a valid start point.",
 			    cmd_network_->pathName(pin));
 	else
-	  report_->warn(16, "'%s' is not a valid startoint.",
+	  report_->warn(18, "'%s' is not a valid start point.",
 			cmd_network_->pathName(pin));
       }
     }
@@ -2090,7 +2084,7 @@ Sta::checkExceptionToPins(ExceptionTo *to,
       const Pin *pin = pin_iter.next();
       if (sdc_->exceptionToInvalid(pin)) {
 	if (line)
-	  report_->fileWarn(161, file, line, "'%s' is not a valid endpoint.",
+	  report_->fileWarn(266, file, line, "'%s' is not a valid endpoint.",
 			    cmd_network_->pathName(pin));
 	else
 	  report_->warn(17, "'%s' is not a valid endpoint.",
@@ -2579,25 +2573,31 @@ Sta::updateTiming(bool full)
   search_->findAllArrivals();
 }
 
+////////////////////////////////////////////////////////////////
+
 void
 Sta::reportClkSkew(ClockSet *clks,
 		   const Corner *corner,
 		   const SetupHold *setup_hold,
 		   int digits)
 {
-  ensureClkArrivals();
-  if (clk_skews_ == nullptr)
-    clk_skews_ = new ClkSkews(this);
+  clkSkewPreamble();
   clk_skews_->reportClkSkew(clks, corner, setup_hold, digits);
 }
 
 float
 Sta::findWorstClkSkew(const SetupHold *setup_hold)
 {
+  clkSkewPreamble();
+  return clk_skews_->findWorstClkSkew(cmd_corner_, setup_hold);
+}
+
+void
+Sta::clkSkewPreamble()
+{
   ensureClkArrivals();
   if (clk_skews_ == nullptr)
     clk_skews_ = new ClkSkews(this);
-  return clk_skews_->findWorstClkSkew(cmd_corner_, setup_hold);
 }
 
 ////////////////////////////////////////////////////////////////
@@ -2797,6 +2797,26 @@ Sta::vertexWorstSlackPath(Vertex *vertex,
 
 {
   return vertexWorstSlackPath(vertex, nullptr, min_max);
+}
+
+Arrival
+Sta::vertexArrival(Vertex *vertex,
+                   const MinMax *min_max)
+{
+  searchPreamble();
+  search_->findArrivals(vertex->level());
+  Arrival arrival = min_max->initValue();
+  VertexPathIterator path_iter(vertex, this);
+  while (path_iter.hasNext()) {
+    Path *path = path_iter.next();
+    const Arrival &path_arrival = path->arrival(this);
+    ClkInfo *clk_info = path->clkInfo(search_);
+    if (path->minMax(this) == min_max
+	&& !clk_info->isGenClkSrcPath()
+	&& delayGreater(path->arrival(this), arrival, min_max, this))
+      arrival = path_arrival;
+  }
+  return arrival;
 }
 
 Arrival
@@ -3193,6 +3213,16 @@ Sta::totalNegativeSlack(const Corner *corner,
   return search_->totalNegativeSlack(corner, min_max);
 }
 
+Slack
+Sta::worstSlack(const MinMax *min_max)
+{
+  searchPreamble();
+  Slack worst_slack;
+  Vertex *worst_vertex;
+  search_->worstSlack(min_max, worst_slack, worst_vertex);
+  return worst_slack;
+}
+
 void
 Sta::worstSlack(const MinMax *min_max,
 		// Return values.
@@ -3200,7 +3230,7 @@ Sta::worstSlack(const MinMax *min_max,
 		Vertex *&worst_vertex)
 {
   searchPreamble();
-  return search_->worstSlack(min_max, worst_slack, worst_vertex);
+  search_->worstSlack(min_max, worst_slack, worst_vertex);
 }
 
 void
@@ -4820,7 +4850,7 @@ Sta::findFaninPins(Vertex *vertex,
 		   PinSet *fanin,
 		   SearchPred &pred)
 {
-  VertexSet visited;
+  VertexSet visited(graph_);
   findFaninPins(vertex, flat, inst_levels,
 		pin_levels, visited, &pred, 0, 0);
   VertexSet::Iterator visited_iter(visited);
@@ -4930,7 +4960,7 @@ Sta::findFanoutPins(Vertex *vertex,
 		    PinSet *fanout,
 		    SearchPred &pred)
 {
-  VertexSet visited;
+  VertexSet visited(graph_);
   findFanoutPins(vertex, flat, inst_levels,
 		 pin_levels, visited, &pred, 0, 0);
   VertexSet::Iterator visited_iter(visited);
@@ -5174,6 +5204,44 @@ Sta::checkSlew(const Pin *pin,
 				corner1, rf, slew, limit, slack);
 }
 
+void
+Sta::maxSlewCheck(// Return values.
+                  Pin *&pin,
+                  Slew &slew,
+                  float &slack,
+                  float &limit)
+{
+  checkSlewLimitPreamble();
+  PinSeq *pins = check_slew_limits_->checkSlewLimits(nullptr, false, nullptr,
+                                                     MinMax::max());
+  pin = nullptr;
+  slew = 0.0;
+  slack = INF;
+  limit = INF;
+  if (!pins->empty()) {
+    pin = (*pins)[0];
+    const Corner *corner;
+    const RiseFall *rf;
+    check_slew_limits_->checkSlew(pin, nullptr, MinMax::max(), true,
+                                  corner, rf, slew, limit, slack);
+  }
+  delete pins;
+}
+
+void
+Sta::findSlewLimit(const LibertyPort *port,
+                   const Corner *corner,
+                   const MinMax *min_max,
+                   // Return values.
+                   float &limit,
+                   bool &exists)
+{
+  if (check_slew_limits_ == nullptr)
+    makeCheckSlewLimits();
+  check_slew_limits_->findLimit(port, corner, min_max,
+                                limit, exists);
+}
+
 ////////////////////////////////////////////////////////////////'
 
 void
@@ -5232,6 +5300,27 @@ Sta::checkFanout(const Pin *pin,
 {
   check_fanout_limits_->checkFanout(pin, min_max,
 				    fanout, limit, slack);
+}
+
+void
+Sta::maxFanoutCheck(// Return values.
+                    Pin *&pin,
+                    float &fanout,
+                    float &slack,
+                    float &limit)
+{
+  checkFanoutLimitPreamble();
+  PinSeq *pins = check_fanout_limits_->checkFanoutLimits(nullptr, false, MinMax::max());
+  pin = nullptr;
+  fanout = 0;
+  slack = INF;
+  limit = INF;
+  if (!pins->empty()) {
+    pin = (*pins)[0];
+    check_fanout_limits_->checkFanout(pin, MinMax::max(),
+                                      fanout, limit, slack);
+  }
+  delete pins;
 }
 
 ////////////////////////////////////////////////////////////////'
@@ -5306,6 +5395,31 @@ Sta::checkCapacitance(const Pin *pin,
   check_capacitance_limits_->checkCapacitance(pin, corner, min_max,
 					      corner1, rf, capacitance,
 					      limit, slack);
+}
+
+void
+Sta::maxCapacitanceCheck(// Return values.
+                         Pin *&pin,
+                         float &capacitance,
+                         float &slack,
+                         float &limit)
+{
+  checkCapacitanceLimitPreamble();
+  PinSeq *pins = check_capacitance_limits_->checkCapacitanceLimits(nullptr, false,
+                                                                   nullptr,
+                                                                   MinMax::max());
+  pin = nullptr;
+  capacitance = 0.0;
+  slack = INF;
+  limit = INF;
+  if (!pins->empty()) {
+    pin = (*pins)[0];
+    const Corner *corner;
+    const RiseFall *rf;
+    check_capacitance_limits_->checkCapacitance(pin, nullptr, MinMax::max(),
+                                                corner, rf, capacitance, limit, slack);
+  }
+  delete pins;
 }
 
 ////////////////////////////////////////////////////////////////
@@ -5458,6 +5572,21 @@ Sta::equivCells(LibertyCell *cell)
 }
 
 ////////////////////////////////////////////////////////////////
+
+void
+Sta::writeTimingModel(const char *lib_name,
+                      const char *cell_name,
+                      const char *filename,
+                      const Corner *corner)
+{
+  MakeTimingModel maker(corner, this);
+  LibertyLibrary *library = maker.makeTimingModel(lib_name, cell_name,
+                                                  filename);
+  writeLiberty(library, filename, this);
+}
+
+////////////////////////////////////////////////////////////////
+
 void
 Sta::powerPreamble()
 {
@@ -5488,6 +5617,13 @@ Sta::power(const Instance *inst,
 {
   powerPreamble();
   power_->power(inst, corner, result);
+}
+
+PwrActivity
+Sta::findClkedActivity(const Pin *pin)
+{
+  powerPreamble();
+  return power_->findClkedActivity(pin);
 }
 
 ////////////////////////////////////////////////////////////////

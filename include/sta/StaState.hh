@@ -16,8 +16,6 @@
 
 #pragma once
 
-#include "DisallowCopyAssign.hh"
-
 namespace sta {
 
 class Report;
@@ -122,9 +120,6 @@ protected:
   DispatchQueue *dispatch_queue_;
   bool pocv_enabled_;
   float sigma_factor_;
-
-private:
-  DISALLOW_COPY_AND_ASSIGN(StaState);
 };
 
 } // namespace

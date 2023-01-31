@@ -58,8 +58,6 @@ public:
   void setFoundLatchFdbkEdges(bool found);
 
 protected:
-  DISALLOW_COPY_AND_ASSIGN(GenclkInfo);
-
   Clock *gclk_;
   Level gclk_level_;
   VertexSet *fanins_;
@@ -156,7 +154,7 @@ Genclks::srcPathVertex(const Pin *pin) const
 }
 
 Level
-Genclks::clkPinMaxLevel(Clock *clk) const
+Genclks::clkPinMaxLevel(const Clock *clk) const
 {
   Level max_level = 0;
   for (Pin *pin : clk->leafPins()) {
@@ -241,9 +239,6 @@ public:
 
 protected:
   const StaState *sta_;
-
-private:
-  DISALLOW_COPY_AND_ASSIGN(GenClkMasterSearchPred);
 };
 
 GenClkMasterSearchPred::GenClkMasterSearchPred(const StaState *sta) :
@@ -394,7 +389,7 @@ void
 Genclks::seedSrcPins(Clock *clk,
 		     BfsBkwdIterator &iter)
 {
-  VertexSet src_vertices;
+  VertexSet src_vertices(graph_);
   clk->srcPinVertices(src_vertices, network_, graph_);
   VertexSet::Iterator vertex_iter(src_vertices);
   while (vertex_iter.hasNext()) {
@@ -419,8 +414,6 @@ public:
   virtual bool searchTo(const Vertex *to_vertex);
 
 private:
-  DISALLOW_COPY_AND_ASSIGN(GenClkFaninSrchPred);
-
   bool combinational_;
 };
 
@@ -503,7 +496,6 @@ public:
   virtual bool searchTo(const Vertex *to_vertex);
 
 private:
-  DISALLOW_COPY_AND_ASSIGN(GenClkInsertionSearchPred);
   bool isNonGeneratedClkPin(const Pin *pin) const;
 
   Clock *gclk_;
@@ -591,7 +583,7 @@ Genclks::makeGenclkInfo(Clock *gclk)
 {
   FilterPath *src_filter = makeSrcFilter(gclk);
   Level gclk_level = clkPinMaxLevel(gclk);
-  VertexSet *fanins = new VertexSet;
+  VertexSet *fanins = new VertexSet(graph_);
   findFanin(gclk, fanins);
   GenclkInfo *genclk_info = new GenclkInfo(gclk, gclk_level, fanins,
 					    src_filter);
@@ -651,8 +643,8 @@ Genclks::findLatchFdbkEdges(const Clock *gclk,
   EdgeSet *fdbk_edges = nullptr;
   for (Pin *pin : gclk->masterClk()->leafPins()) {
     Vertex *vertex = graph_->pinDrvrVertex(pin);
-    VertexSet path_vertices;
-    VertexSet visited_vertices;
+    VertexSet path_vertices(graph_);
+    VertexSet visited_vertices(graph_);
     SearchPred1 srch_pred(this);
     findLatchFdbkEdges(vertex, gclk_level, srch_pred, path_vertices,
 		       visited_vertices, fdbk_edges);
@@ -778,8 +770,6 @@ public:
   virtual bool searchTo(const Vertex *to_vertex);
 
 private:
-  DISALLOW_COPY_AND_ASSIGN(GenClkArrivalSearchPred);
-
   bool combinational_;
 };
 
@@ -866,26 +856,22 @@ VertexVisitor *
 GenclkSrcArrivalVisitor::copy() const
 {
   return new GenclkSrcArrivalVisitor(gclk_, insert_iter_, genclk_info_,
-				     always_to_endpoints_, pred_, sta_);
+				     always_to_endpoints_, pred_, this);
 }
 
 void
 GenclkSrcArrivalVisitor::visit(Vertex *vertex)
 {
-  const Debug *debug = sta_->debug();
-  const Network *sdc_network = sta_->sdcNetwork();
-  const Graph *graph = sta_->graph();
-  Search *search = sta_->search();
-  Genclks *genclks = search->genclks();
-  debugPrint(debug, "genclk", 2, "find gen clk insert arrival %s",
-             vertex->name(sdc_network));
+  Genclks *genclks = search_->genclks();
+  debugPrint(debug_, "genclk", 2, "find gen clk insert arrival %s",
+             vertex->name(sdc_network_));
   tag_bldr_->init(vertex);
-  has_fanin_one_ = graph->hasFaninOne(vertex);
+  has_fanin_one_ = graph_->hasFaninOne(vertex);
   genclks->copyGenClkSrcPaths(vertex, tag_bldr_);
   visitFaninPaths(vertex);
   // Propagate beyond the clock tree to reach generated clk roots.
   insert_iter_->enqueueAdjacentVertices(vertex, &srch_pred_);
-  search->setVertexArrivals(vertex, tag_bldr_);
+  search_->setVertexArrivals(vertex, tag_bldr_);
 }
 
 void
@@ -1201,19 +1187,15 @@ PllArrivalVisitor::PllArrivalVisitor(const StaState *sta,
 void
 PllArrivalVisitor::visit(Vertex *vertex)
 {
-  const Debug *debug = sta_->debug();
-  const Network *sdc_network = sta_->network();
-  Graph *graph = sta_->graph();
-  Search *search = sta_->search();
-  Genclks *genclks = search->genclks();
-  debugPrint(debug, "genclk", 2, "find gen clk pll arrival %s",
-             vertex->name(sdc_network));
+  Genclks *genclks = search_->genclks();
+  debugPrint(debug_, "genclk", 2, "find gen clk pll arrival %s",
+             vertex->name(sdc_network_));
   tag_bldr_->init(vertex);
   genclks->copyGenClkSrcPaths(vertex, tag_bldr_);
-  has_fanin_one_ = graph->hasFaninOne(vertex);
+  has_fanin_one_ = graph_->hasFaninOne(vertex);
   visitFaninPaths(vertex);
   pll_iter_.enqueueAdjacentVertices(vertex);
-  search->setVertexArrivals(vertex, tag_bldr_);
+  search_->setVertexArrivals(vertex, tag_bldr_);
 }
 
 void

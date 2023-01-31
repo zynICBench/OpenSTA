@@ -50,6 +50,7 @@
 #include "TimingRole.hh"
 #include "TimingArc.hh"
 #include "Liberty.hh"
+#include "LibertyWriter.hh"
 #include "EquivCells.hh"
 #include "Wireload.hh"
 #include "PortDirection.hh"
@@ -574,6 +575,26 @@ using namespace sta;
 %typemap(out) TimingArc* {
   Tcl_Obj *obj = SWIG_NewInstanceObj($1, $1_descriptor, false);
   Tcl_SetObjResult(interp, obj);
+}
+
+%typemap(out) const TimingArcSetSeq& {
+  Tcl_Obj *list = Tcl_NewListObj(0, nullptr);
+  const TimingArcSetSeq *arc_sets = $1;
+  for (TimingArcSet *arc_set : *arc_sets) {
+    Tcl_Obj *obj = SWIG_NewInstanceObj(arc_set, SWIGTYPE_p_TimingArcSet, false);
+    Tcl_ListObjAppendElement(interp, list, obj);
+  }
+  Tcl_SetObjResult(interp, list);
+}
+
+%typemap(out) const TimingArcSeq& {
+  Tcl_Obj *list = Tcl_NewListObj(0, nullptr);
+  const TimingArcSeq *arcs = $1;
+  for (TimingArc *arc : *arcs) {
+    Tcl_Obj *obj = SWIG_NewInstanceObj(arc, SWIGTYPE_p_TimingArc, false);
+    Tcl_ListObjAppendElement(interp, list, obj);
+  }
+  Tcl_SetObjResult(interp, list);
 }
 
 %typemap(out) Wireload* {
@@ -1238,16 +1259,6 @@ using namespace sta;
   Tcl_SetObjResult(interp, obj);
 }
 
-%typemap(out) TimingArcSetArcIterator* {
-  Tcl_Obj *obj=SWIG_NewInstanceObj($1, $1_descriptor, false);
-  Tcl_SetObjResult(interp, obj);
-}
-
-%typemap(out) LibertyCellTimingArcSetIterator* {
-  Tcl_Obj *obj=SWIG_NewInstanceObj($1, $1_descriptor, false);
-  Tcl_SetObjResult(interp, obj);
-}
-
 %typemap(out) CheckErrorSeq & {
   Tcl_Obj *error_list = Tcl_NewListObj(0, nullptr);
   CheckErrorSeq *check_errors = $1;
@@ -1421,9 +1432,9 @@ using namespace sta;
     Tcl_SetResult(interp, const_cast<char*>(value.stringValue()), TCL_VOLATILE);
     break;
   case PropertyValue::Type::type_float: {
-    char *float_string = stringPrint("%.6e", value.floatValue());
-    Tcl_SetResult(interp, float_string, TCL_VOLATILE);
-    stringDelete(float_string);
+    const Unit *unit = value.unit();
+    const char *float_string = unit->asString(value.floatValue(), 6);
+    Tcl_SetResult(interp, const_cast<char*>(float_string), TCL_VOLATILE);
   }
     break;
   case PropertyValue::Type::type_bool: {
@@ -1647,20 +1658,6 @@ class TimingArcSet
 private:
   TimingArcSet();
   ~TimingArcSet();
-};
-
-class LibertyCellTimingArcSetIterator
-{
-private:
-  LibertyCellTimingArcSetIterator();
-  ~LibertyCellTimingArcSetIterator();
-};
-
-class TimingArcSetArcIterator
-{
-private:
-  TimingArcSetArcIterator();
-  ~TimingArcSetArcIterator();
 };
 
 class TimingArc
@@ -1977,8 +1974,12 @@ report_file_warn(int id,
 void
 report_line(const char *msg)
 {
-  Report *report = Sta::sta()->report();
-  report->reportLineString(msg);
+  Sta *sta = Sta::sta();
+  if (sta)
+    sta->report()->reportLineString(msg);
+  else
+    // After sta::delete_all_memory souce -echo prints the cmd file line
+    printf("%s\n", msg);
 }
 
 void
@@ -2173,6 +2174,13 @@ set_min_library_cmd(char *min_filename,
 		    char *max_filename)
 {
   return Sta::sta()->setMinLibrary(min_filename, max_filename);
+}
+
+void
+write_liberty_cmd(LibertyLibrary *library,
+                  char *filename)
+{
+  writeLiberty(library, filename, Sta::sta());
 }
 
 Library *
@@ -3939,89 +3947,91 @@ format_area(const char *value,
 
 ////////////////////////////////////////////////////////////////
 
-// Unit converstion from sta unit to user interface and visa versa.
+// <unit>_sta_ui conversion from sta units to user interface units.
+// <unit>_ui_sta conversion from user interface units to sta units.
+
 double
 time_ui_sta(double value)
 {
-  return value * Sta::sta()->units()->timeUnit()->scale();
+  return Sta::sta()->units()->timeUnit()->userToSta(value);
 }
 
 double
 time_sta_ui(double value)
 {
-  return value / Sta::sta()->units()->timeUnit()->scale();
+  return Sta::sta()->units()->timeUnit()->staToUser(value);
 }
 
 double
 capacitance_ui_sta(double value)
 {
-  return value * Sta::sta()->units()->capacitanceUnit()->scale();
+  return Sta::sta()->units()->capacitanceUnit()->userToSta(value);
 }
 
 double
 capacitance_sta_ui(double value)
 {
-  return value / Sta::sta()->units()->capacitanceUnit()->scale();
+  return Sta::sta()->units()->capacitanceUnit()->staToUser(value);
 }
 
 double
 resistance_ui_sta(double value)
 {
-  return value * Sta::sta()->units()->resistanceUnit()->scale();
+  return Sta::sta()->units()->resistanceUnit()->userToSta(value);
 }
 
 double
 resistance_sta_ui(double value)
 {
-  return value / Sta::sta()->units()->resistanceUnit()->scale();
+  return Sta::sta()->units()->resistanceUnit()->staToUser(value);
 }
 
 double
 voltage_ui_sta(double value)
 {
-  return value * Sta::sta()->units()->voltageUnit()->scale();
+  return Sta::sta()->units()->voltageUnit()->userToSta(value);
 }
 
 double
 voltage_sta_ui(double value)
 {
-  return value / Sta::sta()->units()->voltageUnit()->scale();
+  return Sta::sta()->units()->voltageUnit()->staToUser(value);
 }
 
 double
 current_ui_sta(double value)
 {
-  return value * Sta::sta()->units()->currentUnit()->scale();
+  return Sta::sta()->units()->currentUnit()->userToSta(value);
 }
 
 double
 current_sta_ui(double value)
 {
-  return value / Sta::sta()->units()->currentUnit()->scale();
+  return Sta::sta()->units()->currentUnit()->staToUser(value);
 }
 
 double
 power_ui_sta(double value)
 {
-  return value * Sta::sta()->units()->powerUnit()->scale();
+  return Sta::sta()->units()->powerUnit()->userToSta(value);
 }
 
 double
 power_sta_ui(double value)
 {
-  return value / Sta::sta()->units()->powerUnit()->scale();
+  return Sta::sta()->units()->powerUnit()->staToUser(value);
 }
 
 double
 distance_ui_sta(double value)
 {
-  return value * Sta::sta()->units()->distanceUnit()->scale();
+  return Sta::sta()->units()->distanceUnit()->userToSta(value);
 }
 
 double
 distance_sta_ui(double value)
 {
-  return value / Sta::sta()->units()->distanceUnit()->scale();
+  return Sta::sta()->units()->distanceUnit()->staToUser(value);
 }
 
 double
@@ -4776,6 +4786,32 @@ max_slew_violation_count()
   return Sta::sta()->checkSlewLimits(nullptr, true, nullptr, MinMax::max())->size();
 }
 
+float
+max_slew_check_slack()
+{
+  cmdLinkedNetwork();
+  Sta *sta = Sta::sta();
+  Pin *pin;
+  Slew slew;
+  float slack;
+  float limit;
+  sta->maxSlewCheck(pin, slew, slack, limit);
+  return sta->units()->timeUnit()->staToUser(slack);
+}
+
+float
+max_slew_check_limit()
+{
+  cmdLinkedNetwork();
+  Sta *sta = Sta::sta();
+  Pin *pin;
+  Slew slew;
+  float slack;
+  float limit;
+  sta->maxSlewCheck(pin, slew, slack, limit);
+  return sta->units()->timeUnit()->staToUser(limit);
+}
+
 void
 report_slew_limit_short_header()
 {
@@ -4816,6 +4852,32 @@ max_fanout_violation_count()
   return Sta::sta()->checkFanoutLimits(nullptr, true, MinMax::max())->size();
 }
 
+float
+max_fanout_check_slack()
+{
+  cmdLinkedNetwork();
+  Sta *sta = Sta::sta();
+  Pin *pin;
+  float fanout;
+  float slack;
+  float limit;
+  sta->maxFanoutCheck(pin, fanout, slack, limit);
+  return slack;;
+}
+
+float
+max_fanout_check_limit()
+{
+  cmdLinkedNetwork();
+  Sta *sta = Sta::sta();
+  Pin *pin;
+  float fanout;
+  float slack;
+  float limit;
+  sta->maxFanoutCheck(pin, fanout, slack, limit);
+  return limit;;
+}
+
 void
 report_fanout_limit_short_header()
 {
@@ -4853,6 +4915,32 @@ max_capacitance_violation_count()
 {
   cmdLinkedNetwork();
   return Sta::sta()->checkCapacitanceLimits(nullptr, true,nullptr,MinMax::max())->size();
+}
+
+float
+max_capacitance_check_slack()
+{
+  cmdLinkedNetwork();
+  Sta *sta = Sta::sta();
+  Pin *pin;
+  float capacitance;
+  float slack;
+  float limit;
+  sta->maxCapacitanceCheck(pin, capacitance, slack, limit);
+  return sta->units()->capacitanceUnit()->staToUser(slack);
+}
+
+float
+max_capacitance_check_limit()
+{
+  cmdLinkedNetwork();
+  Sta *sta = Sta::sta();
+  Pin *pin;
+  float capacitance;
+  float slack;
+  float limit;
+  sta->maxCapacitanceCheck(pin, capacitance, slack, limit);
+  return sta->units()->capacitanceUnit()->staToUser(limit);
 }
 
 void
@@ -4975,6 +5063,17 @@ write_path_spice_cmd(PathRef *path,
 		 lib_subckt_filename, model_filename,
 		 power_name, gnd_name, sta);
 }
+
+void
+write_timing_model_cmd(const char *lib_name,
+                       const char *cell_name,
+                       const char *filename,
+                       const Corner *corner)
+{
+  Sta::sta()->writeTimingModel(lib_name, cell_name, filename, corner);
+}
+
+////////////////////////////////////////////////////////////////
 
 bool
 liberty_supply_exists(const char *supply_name)
@@ -5637,8 +5736,11 @@ find_liberty_ports_matching(const char *pattern,
 LibertyCellPortIterator *
 liberty_port_iterator() { return new LibertyCellPortIterator(self); }
 
-LibertyCellTimingArcSetIterator *
-timing_arc_set_iterator() { return new LibertyCellTimingArcSetIterator(self); }
+const TimingArcSetSeq &
+timing_arc_sets()
+{
+  return self->timingArcSets();
+}
 
 } // LibertyCell methods
 
@@ -5739,27 +5841,15 @@ full_name()
 
 } // TimingArcSet methods
 
-%extend LibertyCellTimingArcSetIterator {
-bool has_next() { return self->hasNext(); }
-TimingArcSet *next() { return self->next(); }
-void finish() { delete self; }
-}
-
 %extend TimingArc {
 LibertyPort *from() { return self->from(); }
 LibertyPort *to() { return self->to(); }
-Transition *from_trans() { return self->fromTrans(); }
-const char *from_trans_name() { return self->fromTrans()->asRiseFall()->name(); }
-Transition *to_trans() { return self->toTrans(); }
-const char *to_trans_name() { return self->toTrans()->asRiseFall()->name(); }
+Transition *from_edge() { return self->fromEdge(); }
+const char *from_edge_name() { return self->fromEdge()->asRiseFall()->name(); }
+Transition *to_edge() { return self->toEdge(); }
+const char *to_edge_name() { return self->toEdge()->asRiseFall()->name(); }
 TimingRole *role() { return self->role(); }
 } // TimingArc methods
-
-%extend TimingArcSetArcIterator {
-bool has_next() { return self->hasNext(); }
-TimingArc *next() { return self->next(); }
-void finish() { delete self; }
-}
 
 %extend Instance {
 Instance *parent() { return cmdLinkedNetwork()->parent(self); }
@@ -5829,39 +5919,6 @@ vertices()
   vertices[1] = vertex_bidirect_drvr;
   vertices[2] = nullptr;
   return vertices;
-}
-
-float
-capacitance(const RiseFall *rf,
-	    const Corner *corner,
-	    const MinMax *min_max)
-{
-  cmdLinkedNetwork();
-  float pin_cap, wire_cap;
-  Sta::sta()->connectedCap(self, rf, corner, min_max, pin_cap, wire_cap);
-  return pin_cap + wire_cap;
-}
-
-float
-pin_capacitance(const RiseFall *rf,
-		const Corner *corner,
-		const MinMax *min_max)
-{
-  cmdLinkedNetwork();
-  float pin_cap, wire_cap;
-  Sta::sta()->connectedCap(self, rf, corner, min_max, pin_cap, wire_cap);
-  return pin_cap;
-}
-
-float
-wire_capacitance(const RiseFall *rf,
-		 const Corner *corner,
-		 const MinMax *min_max)
-{
-  cmdLinkedNetwork();
-  float pin_cap, wire_cap;
-  Sta::sta()->connectedCap(self, rf, corner, min_max, pin_cap, wire_cap);
-  return wire_cap;
 }
 
 } // Pin methods
@@ -6181,8 +6238,8 @@ Pin *from_pin() { return self->from(Sta::sta()->graph())->pin(); }
 Pin *to_pin() { return self->to(Sta::sta()->graph())->pin(); }
 TimingRole *role() { return self->role(); }
 const char *sense() { return timingSenseString(self->sense()); }
-TimingArcSetArcIterator *
-timing_arc_iterator() { return new TimingArcSetArcIterator(self->timingArcSet()); }
+const TimingArcSeq &
+timing_arcs() { return self->timingArcSet()->arcs(); }
 bool is_disabled_loop() { return Sta::sta()->isDisabledLoop(self); }
 bool is_disabled_constraint() { return Sta::sta()->isDisabledConstraint(self);}
 bool is_disabled_constant() { return Sta::sta()->isDisabledConstant(self); }

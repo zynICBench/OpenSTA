@@ -16,7 +16,6 @@
 
 #include "FindRegister.hh"
 
-#include "DisallowCopyAssign.hh"
 #include "TimingRole.hh"
 #include "FuncExpr.hh"
 #include "TimingArc.hh"
@@ -47,8 +46,6 @@ public:
   virtual bool searchFrom(const Vertex *from_vertex);
 
 private:
-  DISALLOW_COPY_AND_ASSIGN(FindRegClkPred);
-
   Clock *clk_;
 };
 
@@ -90,7 +87,6 @@ public:
 		 bool latches);
 
 private:
-  DISALLOW_COPY_AND_ASSIGN(FindRegVisitor);
   void visitRegs(const Pin *clk_pin,
 		 TimingSense clk_sense,
 		 const RiseFallBoth *clk_rf,
@@ -143,7 +139,7 @@ FindRegVisitor::visitRegs(ClockSet *clks,
     while (clk_iter.hasNext()) {
       Clock *clk = clk_iter.next();
       FindRegClkPred clk_pred(clk, this);
-      VertexSet visited_vertices;
+      VertexSet visited_vertices(graph_);
       for (Pin *pin : clk->leafPins()) {
 	Vertex *vertex, *bidirect_drvr_vertex;
 	graph_->pinVertices(pin, vertex, bidirect_drvr_vertex);
@@ -162,9 +158,7 @@ FindRegVisitor::visitRegs(ClockSet *clks,
     }
   }
   else {
-    VertexSet::ConstIterator reg_clk_iter(graph_->regClkVertices());
-    while (reg_clk_iter.hasNext()) {
-      Vertex *vertex = reg_clk_iter.next();
+    for (Vertex *vertex : *graph_->regClkVertices()) {
       visitRegs(vertex->pin(), TimingSense::positive_unate,
 		RiseFallBoth::riseFall(),
 		edge_triggered, latches);
@@ -241,10 +235,8 @@ FindRegVisitor::findSequential(const Pin *clk_pin,
 {
   has_seqs = false;
   matches = false;
-  LibertyCellSequentialIterator seq_iter(cell);
-  while (seq_iter.hasNext()) {
+  for (Sequential *seq : cell->sequentials()) {
     has_seqs = true;
-    Sequential *seq = seq_iter.next();
     if ((seq->isRegister() && edge_triggered)
 	|| (seq->isLatch() && latches)) {
       if (clk_rf == RiseFallBoth::riseFall()) {
@@ -279,18 +271,15 @@ FindRegVisitor::findInferedSequential(LibertyCell *cell,
 {
   bool matches = false;
   const RiseFall *clk_rf1 = clk_rf->asRiseFall();
-  LibertyCellTimingArcSetIterator set_iter(cell);
-  while (set_iter.hasNext()) {
-    TimingArcSet *set = set_iter.next();
-    TimingArcSetArcIterator arc_iter(set);
-    TimingArc *arc = arc_iter.next();
-    RiseFall *arc_clk_rf = arc->fromTrans()->asRiseFall();
+  for (TimingArcSet *arc_set : cell->timingArcSets()) {
+    TimingArc *arc = *arc_set->arcs().begin();
+    RiseFall *arc_clk_rf = arc->fromEdge()->asRiseFall();
     bool tr_matches = (clk_rf == RiseFallBoth::riseFall()
 		       || (arc_clk_rf == clk_rf1
 			   && clk_sense == TimingSense::positive_unate)
 		       || (arc_clk_rf == clk_rf1->opposite()
 			   && clk_sense == TimingSense::negative_unate));
-    TimingRole *role = set->role();
+    TimingRole *role = arc_set->role();
     if (tr_matches
 	&& ((role == TimingRole::regClkToQ()
 	     && edge_triggered)
@@ -308,10 +297,8 @@ FindRegVisitor::hasTimingCheck(LibertyCell *cell,
 			       LibertyPort *clk,
 			       LibertyPort *d)
 {
-  LibertyCellTimingArcSetIterator set_iter(cell, clk, d);
-  while (set_iter.hasNext()) {
-    TimingArcSet *set = set_iter.next();
-    TimingRole *role = set->role();
+  for (TimingArcSet *arc_set : cell->timingArcSets(clk, d)) {
+    TimingRole *role = arc_set->role();
     if (role->isTimingCheck())
       return true;
   }
@@ -328,7 +315,6 @@ public:
 			bool latches);
 
 private:
-  DISALLOW_COPY_AND_ASSIGN(FindRegInstances);
   virtual void visitReg(Instance *inst);
   virtual void visitSequential(Instance *inst,
 			       Sequential *seq);
@@ -388,7 +374,6 @@ public:
 		   bool latches);
 
 protected:
-  DISALLOW_COPY_AND_ASSIGN(FindRegPins);
   virtual void visitReg(Instance *inst);
   virtual void visitSequential(Instance *inst,
 			       Sequential *seq);
@@ -468,7 +453,6 @@ public:
   explicit FindRegDataPins(StaState *sta);
 
 private:
-  DISALLOW_COPY_AND_ASSIGN(FindRegDataPins);
   virtual bool matchPin(Pin *pin);
   virtual FuncExpr *seqExpr1(Sequential *seq);
   virtual FuncExpr *seqExpr2(Sequential *seq);
@@ -535,7 +519,6 @@ public:
   explicit FindRegClkPins(StaState *sta);
 
 private:
-  DISALLOW_COPY_AND_ASSIGN(FindRegClkPins);
   virtual bool matchPin(Pin *pin);
   virtual FuncExpr *seqExpr1(Sequential *seq);
   virtual FuncExpr *seqExpr2(Sequential *seq);
@@ -551,10 +534,8 @@ FindRegClkPins::matchPin(Pin *pin)
 {
   LibertyPort *port = network_->libertyPort(pin);
   LibertyCell *cell = port->libertyCell();
-  LibertyCellTimingArcSetIterator set_iter(cell, port, nullptr);
-  while (set_iter.hasNext()) {
-    TimingArcSet *set = set_iter.next();
-    TimingRole *role = set->role();
+  for (TimingArcSet *arc_set : cell->timingArcSets(port, nullptr)) {
+    TimingRole *role = arc_set->role();
     if (role->isTimingCheck())
       return true;
   }
@@ -593,7 +574,6 @@ public:
   explicit FindRegAsyncPins(StaState *sta);
 
 private:
-  DISALLOW_COPY_AND_ASSIGN(FindRegAsyncPins);
   virtual bool matchPin(Pin *pin);
   virtual FuncExpr *seqExpr1(Sequential *seq) { return seq->clear(); }
   virtual FuncExpr *seqExpr2(Sequential *seq) { return seq->preset(); }
@@ -609,10 +589,8 @@ FindRegAsyncPins::matchPin(Pin *pin)
 {
   LibertyPort *port = network_->libertyPort(pin);
   LibertyCell *cell = port->libertyCell();
-  LibertyCellTimingArcSetIterator set_iter(cell, port, nullptr);
-  while (set_iter.hasNext()) {
-    TimingArcSet *set = set_iter.next();
-    TimingRole *role = set->role();
+  for (TimingArcSet *arc_set : cell->timingArcSets(port, nullptr)) {
+    TimingRole *role = arc_set->role();
     if (role == TimingRole::regSetClr())
       return true;
   }
@@ -638,7 +616,6 @@ public:
   explicit FindRegOutputPins(StaState *sta);
 
 private:
-  DISALLOW_COPY_AND_ASSIGN(FindRegOutputPins);
   virtual bool matchPin(Pin *pin);
   virtual void visitSequential(Instance *inst,
 			       Sequential *seq);
@@ -659,10 +636,8 @@ FindRegOutputPins::matchPin(Pin *pin)
 {
   LibertyPort *port = network_->libertyPort(pin);
   LibertyCell *cell = port->libertyCell();
-  LibertyCellTimingArcSetIterator set_iter(cell, nullptr, port);
-  while (set_iter.hasNext()) {
-    TimingArcSet *set = set_iter.next();
-    TimingRole *role = set->role();
+  for (TimingArcSet *arc_set : cell->timingArcSets(nullptr, port)) {
+    TimingRole *role = arc_set->role();
     if (role == TimingRole::regClkToQ()
 	|| role == TimingRole::latchEnToQ()
 	|| role == TimingRole::latchDtoQ())

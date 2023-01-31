@@ -17,7 +17,6 @@
 
 #include "Network.hh"
 
-#include "DisallowCopyAssign.hh"
 #include "StringUtil.hh"
 #include "PatternMatch.hh"
 #include "Liberty.hh"
@@ -1087,7 +1086,6 @@ public:
   Instance *next();
 
 private:
-  DISALLOW_COPY_AND_ASSIGN(LeafInstanceIterator1);
   void nextInst();
 
   const Network *network_;
@@ -1234,9 +1232,6 @@ public:
 
 protected:
   PinSet::Iterator pin_iter_;
-
-private:
-  DISALLOW_COPY_AND_ASSIGN(ConnectedPinIterator1);
 };
 
 ConnectedPinIterator1::ConnectedPinIterator1(PinSet *pins) :
@@ -1269,9 +1264,6 @@ public:
 
 protected:
   PinSet *pins_;
-
-private:
-  DISALLOW_COPY_AND_ASSIGN(FindConnectedPins);
 };
 
 FindConnectedPins::FindConnectedPins(PinSet *pins) :
@@ -1444,9 +1436,6 @@ public:
 protected:
   PinSet *pins_;
   const Network *network_;
-
-private:
-  DISALLOW_COPY_AND_ASSIGN(FindDrvrPins);
 };
 
 FindDrvrPins::FindDrvrPins(PinSet *pins,

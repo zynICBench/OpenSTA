@@ -63,9 +63,15 @@ edgeDelayProperty(Edge *edge,
 		  const RiseFall *rf,
 		  const MinMax *min_max,
 		  Sta *sta);
-static float
+static PropertyValue
 delayPropertyValue(Delay delay,
 		   Sta *sta);
+static PropertyValue
+resistancePropertyValue(float res,
+                        Sta *sta);
+static PropertyValue
+capacitancePropertyValue(float cap,
+                         Sta *sta);
 
 ////////////////////////////////////////////////////////////////
 
@@ -100,91 +106,107 @@ PropertyUnknown::what() const noexcept
 ////////////////////////////////////////////////////////////////
 
 PropertyValue::PropertyValue() :
-  type_(type_none)
+  type_(type_none),
+  unit_(nullptr)
 {
 }
 
 PropertyValue::PropertyValue(const char *value) :
   type_(type_string),
-  string_(stringCopy(value))
+  string_(stringCopy(value)),
+  unit_(nullptr)
 {
 }
 
 PropertyValue::PropertyValue(std::string &value) :
   type_(type_string),
-  string_(stringCopy(value.c_str()))
+  string_(stringCopy(value.c_str())),
+  unit_(nullptr)
 {
 }
 
-PropertyValue::PropertyValue(float value) :
+PropertyValue::PropertyValue(float value,
+                             const Unit *unit) :
   type_(type_float),
-  float_(value)
+  float_(value),
+  unit_(unit)
 {
 }
 
 PropertyValue::PropertyValue(bool value) :
   type_(type_bool),
-  bool_(value)
+  bool_(value),
+  unit_(nullptr)
 {
 }
 
 PropertyValue::PropertyValue(LibertyLibrary *value) :
   type_(type_liberty_library),
-  liberty_library_(value)
+  liberty_library_(value),
+  unit_(nullptr)
 {
 }
 
 PropertyValue::PropertyValue(LibertyCell *value) :
   type_(type_liberty_cell),
-  liberty_cell_(value)
+  liberty_cell_(value),
+  unit_(nullptr)
 {
 }
 
 PropertyValue::PropertyValue(LibertyPort *value) :
   type_(type_liberty_port),
-  liberty_port_(value)
+  liberty_port_(value),
+  unit_(nullptr)
 {
 }
 
 PropertyValue::PropertyValue(Library *value) :
   type_(type_library),
-  library_(value)
+  library_(value),
+  unit_(nullptr)
 {
 }
 
 PropertyValue::PropertyValue(Cell *value) :
   type_(type_cell),
-  cell_(value)
+  cell_(value),
+  unit_(nullptr)
 {
 }
 
 PropertyValue::PropertyValue(Port *value) :
   type_(type_port),
-  port_(value)
+  port_(value),
+  unit_(nullptr)
 {
 }
 
 PropertyValue::PropertyValue(Instance *value) :
   type_(type_instance),
-  inst_(value)
+  inst_(value),
+  unit_(nullptr)
 {
 }
 
 PropertyValue::PropertyValue(Pin *value) :
   type_(type_pin),
-  pin_(value)
+  pin_(value),
+  unit_(nullptr)
 {
 }
 
 PropertyValue::PropertyValue(PinSeq *value) :
   type_(type_pins),
-  pins_(value)
+  pins_(value),
+  unit_(nullptr)
 {
 }
 
 PropertyValue::PropertyValue(PinSet *value) :
   type_(type_pins),
-  pins_(new PinSeq)
+  pins_(new PinSeq),
+  unit_(nullptr)
 {
   PinSet::Iterator pin_iter(value);
   while (pin_iter.hasNext()) {
@@ -195,25 +217,29 @@ PropertyValue::PropertyValue(PinSet *value) :
 
 PropertyValue::PropertyValue(Net *value) :
   type_(type_net),
-  net_(value)
+  net_(value),
+  unit_(nullptr)
 {
 }
 
 PropertyValue::PropertyValue(Clock *value) :
   type_(type_clk),
-  clk_(value)
+  clk_(value),
+  unit_(nullptr)
 {
 }
 
 PropertyValue::PropertyValue(ClockSeq *value) :
   type_(type_clks),
-  clks_(new ClockSeq(*value))
+  clks_(new ClockSeq(*value)),
+  unit_(nullptr)
 {
 }
 
 PropertyValue::PropertyValue(ClockSet *value) :
   type_(type_clks),
-  clks_(new ClockSeq)
+  clks_(new ClockSeq),
+  unit_(nullptr)
 {
   ClockSet::Iterator clk_iter(value);
   while (clk_iter.hasNext()) {
@@ -224,18 +250,21 @@ PropertyValue::PropertyValue(ClockSet *value) :
 
 PropertyValue::PropertyValue(PathRefSeq *value) :
   type_(type_path_refs),
-  path_refs_(new PathRefSeq(*value))
+  path_refs_(new PathRefSeq(*value)),
+  unit_(nullptr)
 {
 }
 
 PropertyValue::PropertyValue(PwrActivity *value) :
   type_(type_pwr_activity),
-  pwr_activity_(*value)
+  pwr_activity_(*value),
+  unit_(nullptr)
 {
 }
 
 PropertyValue::PropertyValue(const PropertyValue &value) :
-  type_(value.type_)
+  type_(value.type_),
+  unit_(value.unit_)
 {
   switch (type_) {
   case Type::type_none:
@@ -295,7 +324,9 @@ PropertyValue::PropertyValue(const PropertyValue &value) :
 }
 
 PropertyValue::PropertyValue(PropertyValue &&value) :
-  type_(value.type_)
+  type_(value.type_),
+  unit_(value.unit_)
+
 {
   switch (type_) {
   case Type::type_none:
@@ -384,6 +415,8 @@ PropertyValue &
 PropertyValue::operator=(const PropertyValue &value)
 {
   type_ = value.type_;
+  unit_ = value.unit_;
+
   switch (type_) {
   case Type::type_none:
     break;
@@ -446,6 +479,8 @@ PropertyValue &
 PropertyValue::operator=(PropertyValue &&value)
 {
   type_ = value.type_;
+  unit_ = value.unit_;
+
   switch (type_) {
   case Type::type_none:
     break;
@@ -620,7 +655,7 @@ getProperty(const Port *port,
   else if (stringEqual(property, "activity")) {
     const Instance *top_inst = network->topInstance();
     const Pin *pin = network->findPin(top_inst, port);
-    PwrActivity activity = sta->power()->findClkedActivity(pin);
+    PwrActivity activity = sta->findClkedActivity(pin);
     return PropertyValue(&activity);
   }
 
@@ -685,55 +720,55 @@ getProperty(const LibertyPort *port,
     return PropertyValue(port->direction()->name());
   else if (stringEqual(property, "capacitance")) {
     float cap = port->capacitance(RiseFall::rise(), MinMax::max());
-    return PropertyValue(sta->units()->capacitanceUnit()->asString(cap, 6));
+    return capacitancePropertyValue(cap, sta);
   }
   else if (stringEqual(property, "is_register_clock"))
     return PropertyValue(port->isRegClk());
 
   else if (stringEqual(property, "drive_resistance")) {
     float res = port->driveResistance();
-    return PropertyValue(sta->units()->resistanceUnit()->asString(res, 6));
+    return resistancePropertyValue(res, sta);
   }
   else if (stringEqual(property, "drive_resistance_rise_min")) {
     float res = port->driveResistance(RiseFall::rise(), MinMax::min());
-    return PropertyValue(sta->units()->resistanceUnit()->asString(res, 6));
+    return resistancePropertyValue(res, sta);
   }
   else if (stringEqual(property, "drive_resistance_rise_max")) {
     float res = port->driveResistance(RiseFall::rise(), MinMax::max());
-    return PropertyValue(sta->units()->resistanceUnit()->asString(res, 6));
+    return resistancePropertyValue(res, sta);
   }
   else if (stringEqual(property, "drive_resistance_fall_min")) {
     float res = port->driveResistance(RiseFall::fall(), MinMax::min());
-    return PropertyValue(sta->units()->resistanceUnit()->asString(res, 6));
+    return resistancePropertyValue(res, sta);
   }
   else if (stringEqual(property, "drive_resistance_fall_max")) {
     float res = port->driveResistance(RiseFall::fall(), MinMax::max());
-    return PropertyValue(sta->units()->resistanceUnit()->asString(res, 6));
+    return resistancePropertyValue(res, sta);
   }
 
   else if (stringEqual(property, "intrinsic_delay")) {
-    float drive = delayAsFloat(port->intrinsicDelay(sta));
-    return PropertyValue(sta->units()->timeUnit()->asString(drive, 6));
+    ArcDelay delay = port->intrinsicDelay(sta);
+    return delayPropertyValue(delay, sta);
   }
   else if (stringEqual(property, "intrinsic_delay_rise_min")) {
-    float drive = delayAsFloat(port->intrinsicDelay(RiseFall::rise(),
-                                                    MinMax::min(), sta));
-    return PropertyValue(sta->units()->timeUnit()->asString(drive, 6));
+    ArcDelay delay = port->intrinsicDelay(RiseFall::rise(),
+                                          MinMax::min(), sta);
+    return delayPropertyValue(delay, sta);
   }
   else if (stringEqual(property, "intrinsic_delay_rise_max")) {
-    float drive = delayAsFloat(port->intrinsicDelay(RiseFall::rise(),
-                                                    MinMax::max(), sta));
-    return PropertyValue(sta->units()->timeUnit()->asString(drive, 6));
+    ArcDelay delay = port->intrinsicDelay(RiseFall::rise(),
+                                          MinMax::max(), sta);
+    return delayPropertyValue(delay, sta);
   }
   else if (stringEqual(property, "intrinsic_delay_fall_min")) {
-    float drive = delayAsFloat(port->intrinsicDelay(RiseFall::fall(),
-                                                    MinMax::min(), sta));
-    return PropertyValue(sta->units()->timeUnit()->asString(drive, 6));
+    ArcDelay delay = port->intrinsicDelay(RiseFall::fall(),
+                                          MinMax::min(), sta);
+    return delayPropertyValue(delay, sta);
   }
   else if (stringEqual(property, "intrinsic_delay_fall_max")) {
-    float drive = delayAsFloat(port->intrinsicDelay(RiseFall::fall(),
-                                                    MinMax::max(), sta));
-    return PropertyValue(sta->units()->timeUnit()->asString(drive, 6));
+    ArcDelay delay = port->intrinsicDelay(RiseFall::fall(),
+                                          MinMax::max(), sta);
+    return delayPropertyValue(delay, sta);
   }
   else
     throw PropertyUnknown("liberty port", property);
@@ -786,7 +821,7 @@ getProperty(const Pin *pin,
     return PropertyValue(&clks);
   }
   else if (stringEqual(property, "activity")) {
-    PwrActivity activity = sta->power()->findClkedActivity(pin);
+    PwrActivity activity = sta->findClkedActivity(pin);
     return PropertyValue(&activity);
   }
 
@@ -842,7 +877,7 @@ pinSlewProperty(const Pin *pin,
     if (delayGreater(vertex_slew, slew, min_max, sta))
       slew = vertex_slew;
   }
-  return PropertyValue(delayPropertyValue(slew, sta));
+  return delayPropertyValue(slew, sta);
 }
 
 ////////////////////////////////////////////////////////////////
@@ -873,7 +908,7 @@ getProperty(Edge *edge,
     auto graph = sta->graph();
     const char *from = edge->from(graph)->name(network);
     const char *to = edge->to(graph)->name(network);
-    return stringPrintTmp("%s -> %s", from, to);
+    return PropertyValue(stringPrintTmp("%s -> %s", from, to));
   }
   if (stringEqual(property, "delay_min_fall"))
     return edgeDelayProperty(edge, RiseFall::fall(), MinMax::min(), sta);
@@ -902,10 +937,8 @@ edgeDelayProperty(Edge *edge,
   ArcDelay delay = 0.0;
   bool delay_exists = false;
   TimingArcSet *arc_set = edge->timingArcSet();
-  TimingArcSetArcIterator arc_iter(arc_set);
-  while (arc_iter.hasNext()) {
-    TimingArc *arc = arc_iter.next();
-    RiseFall *to_rf = arc->toTrans()->asRiseFall();
+  for (TimingArc *arc : arc_set->arcs()) {
+    RiseFall *to_rf = arc->toEdge()->asRiseFall();
     if (to_rf == rf) {
       for (auto corner : *sta->corners()) {
 	DcalcAnalysisPt *dcalc_ap = corner->findDcalcAnalysisPt(min_max);
@@ -957,7 +990,7 @@ getProperty(Clock *clk,
       || stringEqual(property, "full_name"))
     return PropertyValue(clk->name());
   else if (stringEqual(property, "period"))
-    return PropertyValue(sta->units()->timeUnit()->asString(clk->period(), 6));
+    return PropertyValue(clk->period(), sta->units()->timeUnit());
   else if (stringEqual(property, "sources"))
     return PropertyValue(&clk->pins());
   else if (stringEqual(property, "propagated"))
@@ -1019,11 +1052,25 @@ getProperty(PathRef *path,
     throw PropertyUnknown("path", property);
 }
 
-static float
+static PropertyValue
 delayPropertyValue(Delay delay,
 		   Sta *sta)
 {
-  return delayAsFloat(delay) / sta->units()->timeUnit()->scale();
+  return PropertyValue(delayAsFloat(delay), sta->units()->timeUnit());
+}
+
+static PropertyValue
+resistancePropertyValue(float res,
+                        Sta *sta)
+{
+  return PropertyValue(res, sta->units()->resistanceUnit());
+}
+
+static PropertyValue
+capacitancePropertyValue(float cap,
+                         Sta *sta)
+{
+  return PropertyValue(cap, sta->units()->capacitanceUnit());
 }
 
 } // namespace

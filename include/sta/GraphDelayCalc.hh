@@ -17,7 +17,6 @@
 #pragma once
 
 #include <string>
-#include "DisallowCopyAssign.hh"
 #include "GraphClass.hh"
 #include "DcalcAnalysisPt.hh"
 #include "StaState.hh"
@@ -44,7 +43,6 @@ class GraphDelayCalc : public StaState
 public:
   explicit GraphDelayCalc(StaState *sta);
   virtual ~GraphDelayCalc() {}
-  virtual void copyState(const StaState *sta);
   // Find arc delays and vertex slews thru level.
   virtual void findDelays(Level /* level */) {};
   // Find and annotate drvr_vertex gate and load delays/slews.
@@ -119,9 +117,6 @@ public:
 		 // Return values.
 		 float &min_period,
 		 bool &exists);
-
-private:
-  DISALLOW_COPY_AND_ASSIGN(GraphDelayCalc);
 };
 
 // Abstract base class for edge delay change observer.
@@ -133,9 +128,6 @@ public:
   virtual void delayChangedFrom(Vertex *vertex) = 0;
   virtual void delayChangedTo(Vertex *vertex) = 0;
   virtual void checkDelayChangedTo(Vertex *vertex) = 0;
-
-private:
-  DISALLOW_COPY_AND_ASSIGN(DelayCalcObserver);
 };
 
 } // namespace

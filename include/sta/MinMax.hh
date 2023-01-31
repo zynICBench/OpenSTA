@@ -18,7 +18,6 @@
 
 #include <array>
 #include <vector>
-#include "DisallowCopyAssign.hh"
 #include "Iterator.hh"
 
 namespace sta {
@@ -72,7 +71,6 @@ public:
   static const int index_bit_count = 1;
 
 private:
-  DISALLOW_COPY_AND_ASSIGN(MinMax);
   MinMax(const char *name,
 	 int index,
 	 float init_value,
@@ -113,7 +111,6 @@ public:
   const std::vector<int> &rangeIndex() const { return range_index_; }
 
 private:
-  DISALLOW_COPY_AND_ASSIGN(MinMaxAll);
   MinMaxAll(const char *name,
 	    int index,
 	    std::vector<MinMax*> range,
@@ -128,26 +125,5 @@ private:
   static MinMaxAll max_;
   static MinMaxAll all_;
 };
-
-////////////////////////////////////////////////////////////////
-
-// Obsolete. Use range iteration.
-class MinMaxIterator : public Iterator<MinMax*>
-{
-public:
-  MinMaxIterator() : index_(0), index_max_(MinMax::index_max) {}
-  explicit MinMaxIterator(const MinMaxAll *min_max);
-  bool hasNext() { return index_ <= index_max_; }
-  MinMax *next()
-  { return (index_++ == 0) ? MinMax::min() : MinMax::max(); }
-
-private:
-  DISALLOW_COPY_AND_ASSIGN(MinMaxIterator);
-
-  int index_;
-  int index_max_;
-};
-
-typedef MinMaxIterator EarlyLateIterator;
 
 } // namespace

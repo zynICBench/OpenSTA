@@ -58,6 +58,18 @@ Unit::operator=(const Unit &unit)
   digits_ = unit.digits_;
 }
 
+double
+Unit::staToUser(double value)
+{
+  return value / scale_;
+}
+
+double
+Unit::userToSta(double value)
+{
+  return value * scale_;
+}
+
 void
 Unit::setScale(float scale)
 {
@@ -65,7 +77,7 @@ Unit::setScale(float scale)
 }
 
 const char *
-Unit::scaleAbreviation()
+Unit::scaleAbreviation() const
 {
   if (fuzzyEqual(scale_, 1E+6))
     return "M";

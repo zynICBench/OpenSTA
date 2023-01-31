@@ -24,7 +24,7 @@ if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.14)
 cmake_policy(SET CMP0086 NEW)
 endif()
 
-project(STA VERSION 2.3.1
+project(STA VERSION 2.3.2
   LANGUAGES CXX
 )
 
@@ -92,12 +92,12 @@ set(STA_SOURCE
   liberty/LibertyExprPvt.hh
   liberty/LibertyParser.cc
   liberty/LibertyReader.cc
+  liberty/LibertyWriter.cc
   liberty/LinearModel.cc
   liberty/Sequential.cc
   liberty/TableModel.cc
   liberty/TimingArc.cc
   liberty/TimingRole.cc
-  liberty/Transition.cc
   liberty/Units.cc
   liberty/Wireload.cc
   
@@ -134,8 +134,6 @@ set(STA_SOURCE
   sdc/PinPair.cc
   sdc/PortDelay.cc
   sdc/PortExtCap.cc
-  sdc/RiseFallMinMax.cc
-  sdc/RiseFallValues.cc
   sdc/Sdc.cc
   sdc/SdcGraph.cc
   sdc/SdcCmdComment.cc
@@ -163,6 +161,7 @@ set(STA_SOURCE
   search/Genclks.cc
   search/Latches.cc
   search/Levelize.cc
+  search/MakeTimingModel.cc
   search/Path.cc
   search/PathAnalysisPt.cc
   search/PathEnd.cc
@@ -188,7 +187,7 @@ set(STA_SOURCE
   search/VisitPathGroupVertices.cc
   search/WorstSlack.cc
   search/WritePathSpice.cc
-  
+
   util/Debug.cc
   util/DispatchQueue.cc
   util/Error.cc
@@ -200,11 +199,14 @@ set(STA_SOURCE
   util/Report.cc
   util/ReportStd.cc
   util/ReportTcl.cc
+  util/RiseFallMinMax.cc
+  util/RiseFallValues.cc
   util/Stats.cc
   util/StringSeq.cc
   util/StringSet.cc
   util/StringUtil.cc
   util/TokenParser.cc
+  util/Transition.cc
   
   verilog/VerilogReader.cc
   verilog/VerilogWriter.cc

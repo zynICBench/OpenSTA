@@ -16,7 +16,6 @@
 
 #pragma once
 
-#include "DisallowCopyAssign.hh"
 #include "Set.hh"
 #include "NetworkClass.hh"
 #include "LibertyClass.hh"
@@ -35,6 +34,10 @@ public:
 		 op_zero};
 
   // Constructors.
+  FuncExpr(Operator op,
+	   FuncExpr *left,
+	   FuncExpr *right,
+	   LibertyPort *port);
   static FuncExpr *makePort(LibertyPort *port);
   static FuncExpr *makeNot(FuncExpr *expr);
   static FuncExpr *makeAnd(FuncExpr *left,
@@ -73,11 +76,6 @@ public:
   bool checkSize(LibertyPort *port);
 
 private:
-  DISALLOW_COPY_AND_ASSIGN(FuncExpr);
-  FuncExpr(Operator op,
-	   FuncExpr *left,
-	   FuncExpr *right,
-	   LibertyPort *port);
   const char *asString(bool with_parens) const;
   const char *asStringSubexpr(bool with_parens,
 			      char op) const;
@@ -100,7 +98,6 @@ public:
   virtual LibertyPort *next() { return iter_.next(); }
 
 private:
-  DISALLOW_COPY_AND_ASSIGN(FuncExprPortIterator);
   void findPorts(FuncExpr *expr);
 
   LibertyPortSet ports_;

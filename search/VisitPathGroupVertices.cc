@@ -118,11 +118,8 @@ visitPathGroupVertices(PathGroup *path_group,
   VisitPathGroupEnds end_visitor(path_group, visitor, &matching_path_map,
 				 &bkwd_iter, sta);
   VisitPathEnds visit_path_ends(sta);
-  VertexSet::Iterator end_iter(search->endpoints());
-  while (end_iter.hasNext()) {
-    Vertex *vertex = end_iter.next();
+  for(Vertex *vertex : *search->endpoints())
     visit_path_ends.visitPathEnds(vertex, &end_visitor);
-  }
 
   // Search backward from the path ends thru vertices that have arrival tags
   // that match path_group end paths.
@@ -234,8 +231,8 @@ PathGroupPathVisitor::~PathGroupPathVisitor()
 VertexVisitor *
 PathGroupPathVisitor::copy() const
 {
-  return new PathGroupPathVisitor(visitor_, bkwd_iter_, matching_path_map_,
-				  sta_);
+  return new PathGroupPathVisitor(visitor_, bkwd_iter_,
+                                  matching_path_map_, this);
 }
 
 void
@@ -244,9 +241,8 @@ PathGroupPathVisitor::visit(Vertex *vertex)
   vertex_matches_ = false;
   visitFanoutPaths(vertex);
   if (vertex_matches_) {
-    const Debug *debug = sta_->debug();
-    debugPrint(debug, "visit_path_group", 1, "visit %s",
-               vertex->name(sta_->network()));
+    debugPrint(debug_, "visit_path_group", 1, "visit %s",
+               vertex->name(network_));
     visitor_->visit(vertex);
     bkwd_iter_->enqueueAdjacentVertices(vertex);
   }
@@ -273,31 +269,29 @@ PathGroupPathVisitor::visitFromToPath(const Pin *,
     int arrival_index;
     bool arrival_exists;
     from_path->arrivalIndex(arrival_index, arrival_exists);
-    PathVertex to_path(to_vertex, to_tag, sta_);
+    PathVertex to_path(to_vertex, to_tag, this);
     if (!to_path.isNull()) {
       if (matching_paths->hasKey(&to_path)) {
-	const Debug *debug = sta_->debug();
-	debugPrint(debug, "visit_path_group", 2, "match %s %s -> %s %s",
-                   from_vertex->name(sta_->network()),
-                   from_tag->asString(sta_),
-                   to_vertex->name(sta_->network()),
-                   to_tag->asString(sta_));
+	debugPrint(debug_, "visit_path_group", 2, "match %s %s -> %s %s",
+                   from_vertex->name(network_),
+                   from_tag->asString(this),
+                   to_vertex->name(network_),
+                   to_tag->asString(this));
 	fromMatches(from_vertex, from_tag, arrival_index);
       }
     }
     else {
-      VertexPathIterator to_iter(to_vertex, to_rf, path_ap, sta_);
+      VertexPathIterator to_iter(to_vertex, to_rf, path_ap, this);
       while (to_iter.hasNext()) {
 	PathVertex *to_path = to_iter.next();
-	if (tagMatchNoCrpr(to_path->tag(sta_), to_tag)
+	if (tagMatchNoCrpr(to_path->tag(this), to_tag)
 	    && matching_paths->hasKey(to_path)) {
-	  const Debug *debug = sta_->debug();
-	  debugPrint(debug, "visit_path_group", 2, 
+	  debugPrint(debug_, "visit_path_group", 2, 
                      "match crpr %s %s -> %s %s",
-                     from_vertex->name(sta_->network()),
-                     from_tag->asString(sta_),
-                     to_vertex->name(sta_->network()),
-                     to_tag->asString(sta_));
+                     from_vertex->name(network_),
+                     from_tag->asString(this),
+                     to_vertex->name(network_),
+                     to_tag->asString(this));
 	  fromMatches(from_vertex, from_tag, arrival_index);
 	}
       }
@@ -313,7 +307,7 @@ PathGroupPathVisitor::fromMatches(Vertex *from_vertex,
 {
   vertex_matches_ = true;
   vertexPathSetMapInsertPath(matching_path_map_, from_vertex,
-			     from_tag, from_arrival_index, sta_);
+			     from_tag, from_arrival_index, this);
 }
 
 } // namespace

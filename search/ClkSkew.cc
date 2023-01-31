@@ -18,7 +18,6 @@
 
 #include <cmath> // abs
 
-#include "DisallowCopyAssign.hh"
 #include "Report.hh"
 #include "Debug.hh"
 #include "Fuzzy.hh"
@@ -39,6 +38,7 @@ namespace sta {
 
 using std::abs;
 
+// Source/target clock skew.
 class ClkSkew
 {
 public:
@@ -190,9 +190,7 @@ ClkSkews::findClkSkew(ClockSet *clks,
 		      const SetupHold *setup_hold,
 		      ClkSkewMap &skews)
 {	      
-  VertexSet::ConstIterator reg_clk_iter(graph_->regClkVertices());
-  while (reg_clk_iter.hasNext()) {
-    Vertex *src_vertex = reg_clk_iter.next();
+  for (Vertex *src_vertex : *graph_->regClkVertices()) {
     if (hasClkPaths(src_vertex, clks)) {
       VertexOutEdgeIterator edge_iter(src_vertex, graph_);
       while (edge_iter.hasNext()) {
@@ -234,8 +232,7 @@ ClkSkews::findClkSkewFrom(Vertex *src_vertex,
 			  const SetupHold *setup_hold,
 			  ClkSkewMap &skews)
 {
-  VertexSet endpoints;
-  findFanout(q_vertex, endpoints);
+  VertexSet endpoints = findFanout(q_vertex);
   VertexSet::Iterator end_iter(endpoints);
   while (end_iter.hasNext()) {
     Vertex *end = end_iter.next();
@@ -316,7 +313,7 @@ ClkSkews::findClkSkew(Vertex *src_vertex,
   }
 }
 
-class FanOutSrchPred : public SearchPred0
+class FanOutSrchPred : public SearchPred1
 {
 public:
   FanOutSrchPred(const StaState *sta);
@@ -324,7 +321,7 @@ public:
 };
 
 FanOutSrchPred::FanOutSrchPred(const StaState *sta) :
-  SearchPred0(sta)
+  SearchPred1(sta)
 {
 }
 
@@ -332,19 +329,19 @@ bool
 FanOutSrchPred::searchThru(Edge *edge)
 {
   TimingRole *role = edge->role();
-  return role == TimingRole::wire()
-    || role == TimingRole::combinational()
-    || role == TimingRole::tristateEnable()
-    || role == TimingRole::tristateDisable();
+  return SearchPred1::searchThru(edge)
+    && (role == TimingRole::wire()
+        || role == TimingRole::combinational()
+        || role == TimingRole::tristateEnable()
+        || role == TimingRole::tristateDisable());
 }
 
-void
-ClkSkews::findFanout(Vertex *from,
-		     // Return value.
-		     VertexSet &endpoints)
+VertexSet
+ClkSkews::findFanout(Vertex *from)
 {
   debugPrint(debug_, "fanout", 1, "%s",
              from->name(sdc_network_));
+  VertexSet endpoints(graph_);
   FanOutSrchPred pred(this);
   BfsFwdIterator fanout_iter(BfsIndex::other, &pred, this);
   fanout_iter.enqueue(from);
@@ -357,6 +354,7 @@ ClkSkews::findFanout(Vertex *from,
     }
     fanout_iter.enqueueAdjacentVertices(fanout);
   }
+  return endpoints;
 }
 
 } // namespace

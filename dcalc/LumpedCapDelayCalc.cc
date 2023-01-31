@@ -76,7 +76,7 @@ LumpedCapDelayCalc::findParasitic(const Pin *drvr_pin,
     }
 
     const MinMax *cnst_min_max = dcalc_ap->constraintMinMax();
-    Wireload *wireload = sdc_->wireloadDefaulted(cnst_min_max);
+    Wireload *wireload = sdc_->wireload(cnst_min_max);
     if (wireload) {
       float pin_cap, wire_cap, fanout;
       bool has_wire_cap;
@@ -174,7 +174,7 @@ LumpedCapDelayCalc::gateDelay(const LibertyCell *drvr_cell,
     drvr_slew = delay_zero;
     drvr_slew_ = 0.0;
   }
-  drvr_rf_ = arc->toTrans()->asRiseFall();
+  drvr_rf_ = arc->toEdge()->asRiseFall();
   drvr_library_ = drvr_cell->libertyLibrary();
   multi_drvr_slew_factor_ = 1.0F;
 }

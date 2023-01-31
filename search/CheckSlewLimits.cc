@@ -155,10 +155,10 @@ CheckSlewLimits::checkSlews1(Vertex *vertex,
       && !sta_->clkNetwork()->isIdealClock(pin)) {
     for (auto rf : RiseFall::range()) {
       float limit;
-      bool limit_exists;
+      bool exists;
       findLimit(pin, vertex, corner, rf, min_max, check_clks,
-		limit, limit_exists);
-      if (limit_exists) {
+		limit, exists);
+      if (exists) {
 	checkSlew(vertex, corner, rf, min_max, limit,
 		  corner1, rf1, slew1, slack1, limit1);
       }
@@ -166,7 +166,7 @@ CheckSlewLimits::checkSlews1(Vertex *vertex,
   }
 }
 
-// return the tightest limit.
+// Return the tightest limit.
 void
 CheckSlewLimits::findLimit(const Pin *pin,
 			   const Vertex *vertex,
@@ -178,14 +178,12 @@ CheckSlewLimits::findLimit(const Pin *pin,
 			   float &limit,
 			   bool &exists) const
 {
-  exists = false;
   const Network *network = sta_->network();
   Sdc *sdc = sta_->sdc();
+  LibertyPort *port = network->libertyPort(pin);
+  findLimit(port, corner, min_max,
+            limit, exists);
 
-  // Default to top ("design") limit.
-  Cell *top_cell = network->cell(network->topInstance());
-  sdc->slewLimit(top_cell, min_max,
-		 limit, exists);
   float limit1;
   bool exists1;
   if (check_clks) {
@@ -207,6 +205,7 @@ CheckSlewLimits::findLimit(const Pin *pin,
       }
     }
   }
+
   if (network->isTopLevelPort(pin)) {
     Port *port = network->port(pin);
     sdc->slewLimit(port, min_max, limit1, exists1);
@@ -241,21 +240,46 @@ CheckSlewLimits::findLimit(const Pin *pin,
       }
     }
   }
-  else {
-    LibertyPort *port = network->libertyPort(pin);
-    if (port) {
-      LibertyPort *corner_port = port->cornerPort(corner->libertyIndex(min_max));
-      corner_port->slewLimit(min_max, limit1, exists1);
-      if (!exists1
-	  && corner_port->direction()->isAnyOutput()
-	  && min_max == MinMax::max())
-	corner_port->libertyLibrary()->defaultMaxSlew(limit1, exists1);
-      if (exists1
-	  && (!exists
-	      || min_max->compare(limit, limit1))) {
-	limit = limit1;
-	exists = true;
-      }
+}
+
+void
+CheckSlewLimits::findLimit(const LibertyPort *port,
+                           const Corner *corner,
+			   const MinMax *min_max,
+			   // Return values.
+			   float &limit,
+			   bool &exists) const
+{
+  limit = INF;
+  exists = false;
+
+  const Network *network = sta_->network();
+  Sdc *sdc = sta_->sdc();
+  float limit1;
+  bool exists1;
+
+  // Default to top ("design") limit.
+  Cell *top_cell = network->cell(network->topInstance());
+  sdc->slewLimit(top_cell, min_max,
+		 limit1, exists1);
+  if (exists1) {
+    limit = limit1;
+    exists = true;
+  }
+
+  if (port) {
+    const LibertyPort *corner_port = port->cornerPort(corner->libertyIndex(min_max));
+    corner_port->slewLimit(min_max, limit1, exists1);
+    if (!exists1
+        // default_max_transition only applies to outputs.
+        && corner_port->direction()->isAnyOutput()
+        && min_max == MinMax::max())
+      corner_port->libertyLibrary()->defaultMaxSlew(limit1, exists1);
+    if (exists1
+        && (!exists
+            || min_max->compare(limit, limit1))) {
+      limit = limit1;
+      exists = true;
     }
   }
 }

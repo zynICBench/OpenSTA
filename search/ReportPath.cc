@@ -586,7 +586,7 @@ ReportPath::latchDesc(const PathEndLatchCheck *end)
   TimingArc *check_arc = end->checkArc();
   TimingArcSet *check_set = check_arc->set();
   LibertyCell *cell = check_set->from()->libertyCell();
-  RiseFall *enable_rf = cell->latchCheckEnableTrans(check_set);
+  RiseFall *enable_rf = cell->latchCheckEnableEdge(check_set);
   return latchDesc(enable_rf);
 }
 
@@ -1008,7 +1008,7 @@ ReportPath::reportSummaryLine(PathEnd *end)
   if (end->isUnconstrained())
     reportSpaceFieldDelay(end->dataArrivalTimeOffset(this), early_late, line);
   else
-    reportSpaceFieldDelay(end->slack(this), early_late, line);
+    reportSpaceFieldDelay(end->slack(this), EarlyLate::early(), line);
   report_->reportLineString(line);
 }
 
@@ -1394,8 +1394,8 @@ ReportPath::reportShort(MaxSkewCheck *check)
   TimingArc *check_arc = check->checkArc();
   auto what = stdstrPrint("%s (%s->%s)",
 			  clk_pin_name,
-			  check_arc->fromTrans()->asString(),
-			  check_arc->toTrans()->asString());
+			  check_arc->fromEdge()->asString(),
+			  check_arc->toEdge()->asString());
   reportDescription(what.c_str(), line);
   const EarlyLate *early_late = EarlyLate::early();
   reportSpaceFieldDelay(check->maxSkew(this), early_late, line);
@@ -1797,7 +1797,7 @@ ReportPath::clkRegLatchDesc(const PathEnd *end)
 {
   // Goofy libraries can have registers with both rising and falling
   // clk->q timing arcs.  Try and match the timing check transition.
-  const RiseFall *check_clk_rf=end->checkArc()->fromTrans()->asRiseFall();
+  const RiseFall *check_clk_rf=end->checkArc()->fromEdge()->asRiseFall();
   TimingArcSet *clk_set = nullptr;
   TimingArcSet *clk_rf_set = nullptr;
   Vertex *tgt_clk_vertex = end->targetClkPath()->vertex(this);
@@ -2801,12 +2801,6 @@ ReportPath::reportInputExternalDelay(const Path *first_path,
 	pathInputDelayRefPath(first_path, input_delay, ref_path);
 	if (!ref_path.isNull() && reportClkPath()) {
 	  PathExpanded ref_expanded(&ref_path, this);
-	  float ref_offset = time_offset;
-	  ClkInfo *ref_clk_info = ref_path.clkInfo(this);
-	  // Ref clk does not include latency for non-ideal clocks.
-	  // Remove it to compensate for reportPath5 adding it.
-	  if (!ref_clk_info->isPropagated())
-	    ref_offset -= ref_clk_info->latency();
 	  reportPath3(&ref_path, ref_expanded, false, true,
 		      delay_zero, 0.0);
 	}
@@ -3286,11 +3280,11 @@ ReportPath::edgeRegLatchDesc(Edge *first_edge,
     }
   }
   else if (role == TimingRole::regClkToQ())
-    return regDesc(first_arc->fromTrans()->asRiseFall());
+    return regDesc(first_arc->fromEdge()->asRiseFall());
   else if (role == TimingRole::latchEnToQ())
-    return latchDesc(first_arc->fromTrans()->asRiseFall());
+    return latchDesc(first_arc->fromEdge()->asRiseFall());
   // Who knows...
-  return regDesc(first_arc->fromTrans()->asRiseFall());
+  return regDesc(first_arc->fromEdge()->asRiseFall());
 }
 
 const char *
